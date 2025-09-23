@@ -7,6 +7,7 @@ import MotoristaHome from './MotoristaHome';
 import FinanceiroJuniorHome from './FinanceiroJuniorHome';
 import FinanceiroMasterHome from './FinanceiroMasterHome';
 import GerenciaHome from './GerenciaHome';
+import OperacionalHome from './OperacionalHome.tsx';
 
 const FuncionarioDashboard: React.FC = () => {
   const { role } = useParams<{ role: string }>();
@@ -24,6 +25,8 @@ const FuncionarioDashboard: React.FC = () => {
       return <FinanceiroMasterHome />;
     case 'gerencia':
       return <GerenciaHome />;
+    case 'operacional':
+      return <OperacionalHome />;
     default:
       return (
         <Layout title="Erro">

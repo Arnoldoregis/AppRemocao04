@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
 import Layout from '../components/Layout';
-import { Download, Search } from 'lucide-react';
+import { CalendarDays, Download, Search } from 'lucide-react';
 import { Removal, RemovalStatus } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
@@ -9,6 +10,7 @@ import { exportToExcel } from '../utils/exportToExcel';
 
 const ReceptorHome: React.FC = () => {
   const { removals } = useRemovals();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<RemovalStatus>('solicitada');
   const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,13 +65,22 @@ const ReceptorHome: React.FC = () => {
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         </div>
-        <button 
-            onClick={handleDownload}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition-colors"
-        >
-          <Download className="h-5 w-5 mr-2" />
-          Baixar Histórico (Excel)
-        </button>
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={() => navigate('/agenda-despedida')}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-purple-700 transition-colors"
+            >
+                <CalendarDays className="h-5 w-5 mr-2" />
+                Agenda de Despedida
+            </button>
+            <button 
+                onClick={handleDownload}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition-colors"
+            >
+              <Download className="h-5 w-5 mr-2" />
+              Baixar Histórico (Excel)
+            </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-md">

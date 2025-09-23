@@ -82,6 +82,7 @@ const RegisterFuncionario: React.FC = () => {
                   <option value="financeiro_junior">Financeiro Junior</option>
                   <option value="financeiro_master">Financeiro Master</option>
                   <option value="gerencia">Gerencia</option>
+                  <option value="operacional">Operacional</option>
                 </select>
               </div>
 

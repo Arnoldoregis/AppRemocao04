@@ -6,7 +6,8 @@ import MotoristaActions from './actions/MotoristaActions';
 import FinanceiroJuniorActions from './actions/FinanceiroJuniorActions';
 import FinanceiroMasterActions from './actions/FinanceiroMasterActions';
 import ClinicaActions from './actions/ClinicaActions';
-import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp } from 'lucide-react';
+import OperacionalActions from './actions/OperacionalActions';
+import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4 } from 'lucide-react';
 import { format } from 'date-fns';
 import { downloadFile } from '../utils/downloadFile';
 import { priceTable } from '../data/pricing';
@@ -112,6 +113,8 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
         return <ReceptorActions removal={removal} onClose={onClose} />;
       case 'motorista':
         return <MotoristaActions removal={removal} onClose={onClose} />;
+      case 'operacional':
+        return <OperacionalActions removal={removal} onClose={onClose} />;
       case 'financeiro_junior':
         return <FinanceiroJuniorActions 
                   removal={removal} 
@@ -144,7 +147,7 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
             <DetailItem label="Status" value={removal.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} />
             <div className="flex items-center justify-between">
                 <DetailItem label="Modalidade" value={removal.modality.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} />
-                {user?.role === 'financeiro_junior' && removal.status === 'concluida' && (
+                {user?.role === 'financeiro_junior' && removal.status === 'aguardando_financeiro_junior' && (
                   <button
                     onClick={() => {
                       setActiveEditTab('change_modality');
@@ -188,6 +191,13 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
             <DetailItem label="Peso (real)" value={removal.realWeight ? `${removal.realWeight} kg` : 'N/A'} />
             <DetailItem label="Causa da Morte" value={removal.pet.causeOfDeath} />
           </DetailSection>
+
+          {(removal.petCondition || removal.farewellSchedulingInfo) && (
+            <DetailSection title="Detalhes Operacionais" icon={Info}>
+              <DetailItem label="Condição do Pet" value={removal.petCondition} />
+              <DetailItem label="Agendamento de Despedida" value={removal.farewellSchedulingInfo} />
+            </DetailSection>
+          )}
 
           <DetailSection title="Dados da Remoção" icon={MapPin}>
             <div className="flex items-start justify-between">
@@ -367,9 +377,9 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
           </DetailSection>
         </div>
         
-        <div className={`sticky bottom-0 bg-gray-50 border-t ${isEditing ? 'h-96' : 'p-4 flex justify-end items-center gap-4'}`}>
+        <div className={`sticky bottom-0 bg-gray-50 border-t ${isEditing && user?.role === 'financeiro_junior' ? 'h-96' : 'p-4 flex justify-end items-center gap-4'}`}>
             {renderActions()}
-            {!isEditing && <button onClick={onClose} className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Fechar</button>}
+            {!(isEditing && user?.role === 'financeiro_junior') && <button onClick={onClose} className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Fechar</button>}
         </div>
       </div>
     </div>

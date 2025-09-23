@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name: string; // Nome da pessoa ou Nome Fantasia da clínica
   userType: 'pessoa_fisica' | 'clinica' | 'funcionario';
-  role?: 'administrador' | 'receptor' | 'motorista' | 'financeiro_junior' | 'financeiro_master' | 'gerencia';
+  role?: 'administrador' | 'receptor' | 'motorista' | 'financeiro_junior' | 'financeiro_master' | 'gerencia' | 'operacional';
   cpf?: string;
   cnpj?: string;
   phone: string;
@@ -35,7 +35,9 @@ export type RemovalStatus =
   | 'em_andamento'        // Receptor direcionou para motorista
   | 'a_caminho'           // Motorista aceitou
   | 'removido'            // Motorista coletou o pet
-  | 'concluida'           // Motorista pesou e finalizou a parte dele
+  | 'concluida'           // Motorista pesou e finalizou -> Agora vai para o Operacional
+  | 'aguardando_financeiro_junior' // Operacional finalizou -> Vai para o Financeiro Jr.
+  | 'aguardando_baixa_master' // Financeiro Jr. finalizou -> Vai para o Master
   | 'aguardando_pagamento'// Financeiro Master gerou boleto
   | 'pagamento_concluido' // Cliente pagou boleto / Fin Master confirmou
   | 'cancelada'           // Cancelado em alguma etapa
@@ -44,8 +46,7 @@ export type RemovalStatus =
   | 'coletivo_pago'
   | 'individual_pago'
   | 'coletivo_faturado'
-  | 'individual_faturado'
-  | 'aguardando_baixa_master';
+  | 'individual_faturado';
 
 
 export interface Removal {
@@ -84,6 +85,8 @@ export interface Removal {
   boletoUrl?: string;
   comprovanteFaturaUrl?: string;
   adjustmentConfirmed?: boolean;
+  petCondition?: string;
+  farewellSchedulingInfo?: string;
 }
 
 export interface Additional {
@@ -137,4 +140,8 @@ export interface Conversation {
   unreadByReceptor: number;
   unreadByClient: number;
   lastMessageTimestamp: string;
+}
+
+export interface FarewellSchedule {
+  [slotKey: string]: Removal; // key is "YYYY-MM-DD-HH:mm" or "YYYY-MM-DD-ENCAIXE EMERGÊNCIA"
 }

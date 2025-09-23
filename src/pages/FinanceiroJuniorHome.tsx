@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
 import Layout from '../components/Layout';
-import { Download, Search } from 'lucide-react';
+import { CalendarDays, Download, Search } from 'lucide-react';
 import { Removal } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
@@ -9,6 +10,7 @@ import { exportToExcel } from '../utils/exportToExcel';
 
 const FinanceiroJuniorHome: React.FC = () => {
   const { removals } = useRemovals();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>('coletivo_pago');
   const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,16 +28,16 @@ const FinanceiroJuniorHome: React.FC = () => {
     let baseFiltered: Removal[] = [];
     switch (activeTab) {
         case 'coletivo_pago':
-          baseFiltered = removals.filter(r => r.status === 'concluida' && r.modality === 'coletivo' && r.paymentMethod !== 'faturado');
+          baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality === 'coletivo' && r.paymentMethod !== 'faturado');
           break;
         case 'coletivo_faturado':
-          baseFiltered = removals.filter(r => r.status === 'concluida' && r.modality === 'coletivo' && r.paymentMethod === 'faturado');
+          baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality === 'coletivo' && r.paymentMethod === 'faturado');
           break;
         case 'individual_pago':
-          baseFiltered = removals.filter(r => r.status === 'concluida' && r.modality !== 'coletivo' && r.paymentMethod !== 'faturado');
+          baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality !== 'coletivo' && r.paymentMethod !== 'faturado');
           break;
         case 'individual_faturado':
-          baseFiltered = removals.filter(r => r.status === 'concluida' && r.modality !== 'coletivo' && r.paymentMethod === 'faturado');
+          baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality !== 'coletivo' && r.paymentMethod === 'faturado');
           break;
         case 'finalizadas_pago':
           baseFiltered = removals.filter(r => r.status === 'aguardando_baixa_master' && r.paymentMethod !== 'faturado');
@@ -84,13 +86,22 @@ const FinanceiroJuniorHome: React.FC = () => {
             className="w-full pl-10 pr-4 py-2 border rounded-lg" />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         </div>
-        <button 
-            onClick={handleDownload}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center"
-        >
-            <Download className="h-5 w-5 mr-2" />
-            Baixar Histórico
-        </button>
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={() => navigate('/agenda-despedida')}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-purple-700 transition-colors"
+            >
+                <CalendarDays className="h-5 w-5 mr-2" />
+                Agenda de Despedida
+            </button>
+            <button 
+                onClick={handleDownload}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center"
+            >
+                <Download className="h-5 w-5 mr-2" />
+                Baixar Histórico
+            </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-md">

@@ -194,7 +194,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     resetAndCloseEdit();
   };
 
-  if (removal.status !== 'concluida') return null;
+  if (removal.status !== 'aguardando_financeiro_junior') return null;
 
   if (isEditing) {
     return (

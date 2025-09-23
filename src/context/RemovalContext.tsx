@@ -121,7 +121,10 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
           addNotification(`O motorista está a caminho da sua solicitação ${code}.`, { recipientId: originalRemoval.createdById });
           break;
         case 'concluida':
-          addNotification(`Nova solicitação ${code} para entrar em contato.`, { recipientRole: 'financeiro_junior' });
+          addNotification(`Remoção ${code} está pronta para análise operacional.`, { recipientRole: 'operacional' });
+          break;
+        case 'aguardando_financeiro_junior':
+          addNotification(`Remoção ${code} aguardando análise financeira.`, { recipientRole: 'financeiro_junior' });
           break;
       }
     }

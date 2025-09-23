@@ -30,6 +30,7 @@ const employeeRoles: { [key: string]: User['role'] } = {
   'financeirojunior@gmail.com': 'financeiro_junior',
   'financeiromaster@gmail.com': 'financeiro_master',
   'gerencia@gmail.com': 'gerencia',
+  'operacional@gmail.com': 'operacional',
 };
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
