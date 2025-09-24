@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, Heart } from 'lucide-react';
+import { Lock, Eye, EyeOff, Heart, ArrowLeft } from 'lucide-react';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -45,15 +45,23 @@ const ResetPassword = () => {
             <p className="text-gray-600 mt-2">Crie uma nova senha para sua conta.</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <div className="bg-white rounded-lg shadow-md p-8 relative">
+          <button
+            onClick={() => navigate('/')}
+            className="absolute top-4 left-4 flex items-center text-sm text-blue-600 hover:text-blue-800"
+            title="Voltar para a página de login"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Voltar ao Login
+          </button>
           {success ? (
-            <div className="text-center py-4">
+            <div className="text-center py-4 mt-8">
               <div className="text-green-600 text-2xl mb-3">✓</div>
               <p className="text-gray-800 font-semibold">Senha redefinida com sucesso!</p>
               <p className="text-gray-600 text-sm">Você será redirecionado para a página de login.</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6 mt-8">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
                 <div className="relative">

@@ -87,6 +87,9 @@ export interface Removal {
   adjustmentConfirmed?: boolean;
   petCondition?: string;
   farewellSchedulingInfo?: string;
+  cremationDate?: string;
+  certificateObservations?: string;
+  contactedByFinance?: boolean;
 }
 
 export interface Additional {

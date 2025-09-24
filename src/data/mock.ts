@@ -19,6 +19,59 @@ export const generateMockRemovals = (): Removal[] => {
         { id: 'motorista_2', name: 'Mariana Lima' },
     ];
 
+    // Gerar 2 remoções para o Financeiro Junior (Coletivo)
+    for (let i = 0; i < 2; i++) {
+        mockRemovals.push({
+            code: `FINJR_COLETIVO_${i+1}`,
+            createdById: 'clinic_456',
+            clinicName: 'Clínica Amigo Fiel',
+            modality: 'coletivo',
+            tutor: { name: faker.person.fullName(), cpfOrCnpj: faker.finance.accountNumber(11), phone: faker.phone.number(), email: faker.internet.email() },
+            pet: { name: faker.animal.cat(), species: 'gato', breed: 'SRD', gender: 'femea', weight: '0-5kg', causeOfDeath: 'Natural' },
+            removalAddress: { street: faker.location.streetAddress(), city: 'Curitiba', state: 'PR', cep: '81000-100', number: '100', neighborhood: 'Bairro' },
+            additionals: [],
+            paymentMethod: 'pix',
+            value: 207.00,
+            observations: 'Tutor ciente do processo coletivo.',
+            requestType: 'agora',
+            status: 'aguardando_financeiro_junior',
+            history: [
+                { date: faker.date.past().toISOString(), action: 'Solicitação criada', user: 'Clínica Amigo Fiel' },
+                { date: faker.date.recent().toISOString(), action: 'Encaminhado para Financeiro Junior', user: 'Operacional (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 2 }).toISOString(),
+            realWeight: 4.8,
+            contactedByFinance: false,
+        });
+    }
+
+    // Gerar 2 remoções para o Financeiro Junior (Individual)
+    for (let i = 0; i < 2; i++) {
+        mockRemovals.push({
+            code: `FINJR_INDIVIDUAL_${i+1}`,
+            createdById: 'pf_123',
+            modality: i % 2 === 0 ? 'individual_ouro' : 'individual_prata',
+            tutor: { name: faker.person.fullName(), cpfOrCnpj: faker.finance.accountNumber(11), phone: faker.phone.number(), email: faker.internet.email() },
+            pet: { name: faker.animal.dog(), species: 'cachorro', breed: 'Golden Retriever', gender: 'macho', weight: '21-40kg', causeOfDeath: 'Idade avançada' },
+            removalAddress: { street: faker.location.streetAddress(), city: 'Curitiba', state: 'PR', cep: '80000-000', number: '123', neighborhood: 'Centro' },
+            additionals: [],
+            paymentMethod: 'credito',
+            value: i % 2 === 0 ? 999.00 : 850.00,
+            observations: 'Aguardando contato para agendamento da despedida.',
+            requestType: 'agora',
+            status: 'aguardando_financeiro_junior',
+            history: [
+                { date: faker.date.past().toISOString(), action: 'Solicitação criada', user: 'Tutor (Teste)' },
+                { date: faker.date.recent().toISOString(), action: 'Encaminhado para Financeiro Junior', user: 'Operacional (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 3 }).toISOString(),
+            realWeight: 35,
+            petCondition: 'Corpo em bom estado, mantido refrigerado.',
+            farewellSchedulingInfo: 'Tutor prefere horários na parte da tarde.',
+            contactedByFinance: false,
+        });
+    }
+
     // Gerar 3 remoções faturadas para a mesma clínica
     for (let i = 0; i < 3; i++) {
         const faturadoRemoval: Removal = {
@@ -56,8 +109,50 @@ export const generateMockRemovals = (): Removal[] => {
             createdAt: faker.date.recent({ days: 15 }).toISOString(),
             assignedDriver: drivers[0],
             realWeight: 4.5,
+            contactedByFinance: true,
         };
         mockRemovals.push(faturadoRemoval);
+    }
+    
+    // Gerar 3 remoções coletivas para a aba "Pendentes Coletivos" do Operacional
+    for (let i = 0; i < 3; i++) {
+        const coletivoPendente: Removal = {
+            code: `COLETIVO_OP_${i+1}`,
+            createdById: 'clinic_456',
+            clinicName: 'Clínica Parceira (Teste)',
+            modality: 'coletivo',
+            tutor: {
+                name: faker.person.fullName(),
+                cpfOrCnpj: faker.finance.accountNumber(11),
+                phone: faker.phone.number(),
+                email: faker.internet.email(),
+            },
+            pet: {
+                name: faker.animal.dog(),
+                species: 'cachorro',
+                breed: 'SRD',
+                gender: faker.helpers.arrayElement(['macho', 'femea']),
+                weight: '11-20kg',
+                causeOfDeath: 'Natural',
+            },
+            removalAddress: { street: faker.location.streetAddress(), city: 'São José dos Pinhais', state: 'PR', cep: '83005-000', number: `${i+1}00`, neighborhood: 'Centro' },
+            additionals: [],
+            paymentMethod: 'pix',
+            value: 255,
+            observations: `Exemplo de remoção coletiva pendente para o operacional ${i+1}.`,
+            requestType: 'agora',
+            status: 'concluida',
+            history: [
+                { date: faker.date.past({ days: 2 }).toISOString(), action: 'Solicitação criada pela Clínica Parceira', user: 'Clínica Parceira' },
+                { date: faker.date.past({ days: 1 }).toISOString(), action: 'Receptor encaminhou para o motorista', user: 'Receptor (Teste)' },
+                { date: faker.date.recent().toISOString(), action: 'Motorista finalizou a remoção e pesagem', user: 'Motorista (Teste)' },
+            ],
+            createdAt: faker.date.past({ days: 2 }).toISOString(),
+            assignedDriver: drivers[i % drivers.length],
+            realWeight: faker.number.int({ min: 12, max: 18 }),
+            contactedByFinance: false,
+        };
+        mockRemovals.push(coletivoPendente);
     }
 
     // Gerar outras remoções
@@ -146,6 +241,7 @@ export const generateMockRemovals = (): Removal[] => {
         cancellationReason: status === 'cancelada' ? 'Solicitado pelo tutor.' : undefined,
         assignedDriver: assignedDriver,
         realWeight: ['concluida', 'finalizada', 'aguardando_baixa_master'].includes(status) ? faker.number.int({ min: 5, max: 20}) : undefined,
+        contactedByFinance: faker.datatype.boolean({ probability: 0.1 }),
       };
       mockRemovals.push(removal);
     }

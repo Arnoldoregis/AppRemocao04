@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
 import Layout from '../components/Layout';
-import { Search, Download, List, Check } from 'lucide-react';
+import { Search, Download, List, Check, Package, CalendarDays } from 'lucide-react';
 import { Removal } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
@@ -9,9 +10,10 @@ import { exportToExcel } from '../utils/exportToExcel';
 
 const OperacionalHome: React.FC = () => {
     const { removals } = useRemovals();
+    const navigate = useNavigate();
     const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState<'pendentes' | 'finalizadas'>('pendentes');
+    const [activeTab, setActiveTab] = useState<'pendentes' | 'coletivos' | 'finalizadas'>('pendentes');
 
     useEffect(() => {
         if (selectedRemoval) {
@@ -24,10 +26,18 @@ const OperacionalHome: React.FC = () => {
 
     const filteredRemovals = useMemo(() => {
         let baseRemovals: Removal[];
-        if (activeTab === 'pendentes') {
-            baseRemovals = removals.filter(r => r.status === 'concluida');
-        } else {
-            baseRemovals = removals.filter(r => r.history.some(h => h.user.toLowerCase().includes('operacional')) && r.status !== 'concluida');
+        switch (activeTab) {
+            case 'pendentes':
+                baseRemovals = removals.filter(r => r.status === 'concluida' && r.modality.includes('individual'));
+                break;
+            case 'coletivos':
+                baseRemovals = removals.filter(r => r.status === 'concluida' && r.modality === 'coletivo');
+                break;
+            case 'finalizadas':
+                baseRemovals = removals.filter(r => r.history.some(h => h.user.toLowerCase().includes('operacional')) && r.status !== 'concluida');
+                break;
+            default:
+                baseRemovals = [];
         }
 
         if (searchTerm) {
@@ -46,7 +56,8 @@ const OperacionalHome: React.FC = () => {
     };
 
     const tabs = [
-        { id: 'pendentes' as const, label: 'Pendentes de Análise', icon: List },
+        { id: 'pendentes' as const, label: 'Pendentes Individuais', icon: List },
+        { id: 'coletivos' as const, label: 'Pendentes Coletivos', icon: Package },
         { id: 'finalizadas' as const, label: 'Análises Finalizadas', icon: Check },
     ];
 
@@ -63,13 +74,22 @@ const OperacionalHome: React.FC = () => {
                     />
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 </div>
-                <button 
-                    onClick={handleDownload}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center"
-                >
-                    <Download className="h-5 w-5 mr-2" />
-                    Baixar Histórico
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => navigate('/agenda-despedida')}
+                        className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-purple-700 transition-colors"
+                    >
+                        <CalendarDays className="h-5 w-5 mr-2" />
+                        Agenda de Despedida
+                    </button>
+                    <button 
+                        onClick={handleDownload}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center"
+                    >
+                        <Download className="h-5 w-5 mr-2" />
+                        Baixar Histórico
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-md">

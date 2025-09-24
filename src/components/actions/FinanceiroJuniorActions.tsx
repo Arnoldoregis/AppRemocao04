@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Removal, CustomAdditional } from '../../types';
 import { useRemovals } from '../../context/RemovalContext';
 import { useAuth } from '../../context/AuthContext';
-import { CheckCircle, Edit, Upload, Plus, Trash2, Save } from 'lucide-react';
+import { useAgenda } from '../../context/AgendaContext';
+import { CheckCircle, Edit, Upload, Plus, Trash2, Save, Flame } from 'lucide-react';
 import { priceTable } from '../../data/pricing';
 
 interface FinanceiroJuniorActionsProps {
@@ -10,8 +11,8 @@ interface FinanceiroJuniorActionsProps {
   onClose: () => void;
   isEditing: boolean;
   setIsEditing: (isEditing: boolean) => void;
-  activeEditTab: 'add' | 'adjust' | 'change_modality';
-  setActiveEditTab: (tab: 'add' | 'adjust' | 'change_modality') => void;
+  activeEditTab: 'add' | 'adjust' | 'change_modality' | 'cremation';
+  setActiveEditTab: (tab: 'add' | 'adjust' | 'change_modality' | 'cremation') => void;
 }
 
 const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({ 
@@ -24,6 +25,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 }) => {
   const { updateRemoval } = useRemovals();
   const { user } = useAuth();
+  const { schedule } = useAgenda();
   
   // State for "Adicionar" tab
   const [items, setItems] = useState<CustomAdditional[]>([]);
@@ -41,12 +43,18 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const [modalityDifference, setModalityDifference] = useState(0);
   const [modalityProof, setModalityProof] = useState<File | null>(null);
 
+  // State for "Dados Cremação" tab
+  const [cremationDate, setCremationDate] = useState('');
+  const [certificateObs, setCertificateObs] = useState('');
+
   useEffect(() => {
     if (isEditing) {
       setItems(removal.customAdditionals || []);
       setNewModality(removal.modality);
+      setCremationDate(removal.cremationDate || '');
+      setCertificateObs(removal.certificateObservations || '');
     }
-  }, [isEditing, removal.customAdditionals, removal.modality]);
+  }, [isEditing, removal]);
 
   const getWeightKeyFromRealWeight = (weight: number): keyof typeof priceTable | null => {
     if (weight <= 5) return '0-5kg';
@@ -85,13 +93,28 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     setNewModality(removal.modality);
     setModalityDifference(0);
     setModalityProof(null);
+    setCremationDate('');
+    setCertificateObs('');
   };
 
   const handleFinalizeForMaster = () => {
     if (!user) return;
+
+    const isScheduled = Object.values(schedule).some(scheduledRemoval => scheduledRemoval.code === removal.code);
+    const actionText = isScheduled
+      ? `finalizou e enviou para o Financeiro Master com despedida agendada`
+      : `finalizou e enviou para o Financeiro Master sem despedida agendada`;
+
     updateRemoval(removal.code, {
       status: 'aguardando_baixa_master',
-      history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} finalizou e enviou para o Financeiro Master`, user: user.name }],
+      history: [
+        ...removal.history,
+        {
+          date: new Date().toISOString(),
+          action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionText}`,
+          user: user.name,
+        },
+      ],
     });
     onClose();
   };
@@ -194,6 +217,49 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     resetAndCloseEdit();
   };
 
+  const handleSaveCremationData = () => {
+    if (!user) return;
+    const dateChanged = cremationDate !== (removal.cremationDate || '');
+    const obsChanged = certificateObs !== (removal.certificateObservations || '');
+
+    if (!dateChanged && !obsChanged) {
+      resetAndCloseEdit();
+      return;
+    }
+
+    const actionParts: string[] = [];
+
+    if (dateChanged && cremationDate) {
+        const [year, month, day] = cremationDate.split('-');
+        const formattedDate = `${day}/${month}/${year}`;
+        actionParts.push(`definiu a data de cremação para ${formattedDate}`);
+    }
+
+    if (obsChanged) {
+        if (certificateObs) {
+            actionParts.push(`adicionou a observação ao certificado: "${certificateObs}"`);
+        } else {
+            actionParts.push(`removeu as observações do certificado`);
+        }
+    }
+
+    const actionText = actionParts.join(' e ');
+
+    if (actionText) {
+        updateRemoval(removal.code, {
+            cremationDate,
+            certificateObservations: certificateObs,
+            history: [...removal.history, { 
+                date: new Date().toISOString(), 
+                action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionText}.`, 
+                user: user.name 
+            }],
+        });
+    }
+
+    resetAndCloseEdit();
+  };
+
   if (removal.status !== 'aguardando_financeiro_junior') return null;
 
   if (isEditing) {
@@ -204,6 +270,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
           <button onClick={() => setActiveEditTab('add')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'add' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Adicionar Produtos</button>
           <button onClick={() => setActiveEditTab('adjust')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'adjust' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Abater Valores</button>
           <button onClick={() => setActiveEditTab('change_modality')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'change_modality' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Alterar Modalidade</button>
+          <button onClick={() => setActiveEditTab('cremation')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'cremation' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Dados Cremação</button>
         </div>
 
         {/* SCROLLABLE CONTENT */}
@@ -259,6 +326,18 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
               </div>
             </div>
           )}
+          {activeEditTab === 'cremation' && (
+            <div className="space-y-4 p-1">
+              <div>
+                <label className="text-xs font-medium text-gray-600">Data da Cremação</label>
+                <input type="date" value={cremationDate} onChange={e => setCremationDate(e.target.value)} className="w-full px-2 py-1 border rounded-md text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">Observações para o Certificado</label>
+                <textarea value={certificateObs} onChange={e => setCertificateObs(e.target.value)} placeholder="Ex: Adicionar nome do tutor no certificado" rows={3} className="w-full px-2 py-1 border rounded-md text-sm" />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* FIXED BUTTONS */}
@@ -268,6 +347,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
           {activeEditTab === 'add' && <button onClick={handleSaveItems} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1"><Save size={14} /> Salvar Produtos</button>}
           {activeEditTab === 'adjust' && <button onClick={handleSaveAdjustment} disabled={!adjustmentValue} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1 disabled:opacity-50"><Save size={14} /> Salvar Abatimento</button>}
           {activeEditTab === 'change_modality' && <button onClick={handleSaveModality} disabled={modalityDifference === 0} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1 disabled:opacity-50"><Save size={14} /> Salvar Alteração</button>}
+          {activeEditTab === 'cremation' && <button onClick={handleSaveCremationData} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1"><Flame size={14} /> Salvar Dados</button>}
         </div>
       </div>
     );

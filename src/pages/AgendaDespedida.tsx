@@ -5,13 +5,15 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useAgenda } from '../context/AgendaContext';
 import IncluirRemocaoModal from '../components/modals/IncluirRemocaoModal';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { Removal } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 const AgendaDespedida: React.FC = () => {
     const { user } = useAuth();
     const { schedule, removeFarewell } = useAgenda();
     const [modalState, setModalState] = useState<{ isOpen: boolean; slotKey: string }>({ isOpen: false, slotKey: '' });
+    const navigate = useNavigate();
 
     const weekDays = useMemo(() => {
         const monday = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -71,6 +73,15 @@ const AgendaDespedida: React.FC = () => {
 
     return (
         <Layout title="Agenda de Despedida">
+            <div className="mb-6">
+                <button
+                    onClick={() => navigate(-1)}
+                    className="flex items-center text-blue-600 hover:text-blue-800 font-semibold"
+                >
+                    <ArrowLeft className="h-5 w-5 mr-2" />
+                    Voltar
+                </button>
+            </div>
             <div className="bg-white p-6 rounded-lg shadow-lg">
                 <h2 className="text-2xl font-bold text-center mb-6 uppercase">Agenda {new Date().getFullYear()}</h2>
                 <div className="overflow-x-auto">

@@ -2,6 +2,7 @@ import React from 'react';
 import { Removal, RemovalStatus } from '../types';
 import { format } from 'date-fns';
 import { List, Clock, CheckCircle, FileWarning, FileCheck, XCircle, Files, Eye, Send } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface RemovalCardProps {
   removal: Removal;
@@ -20,16 +21,23 @@ const statusConfig: { [key in RemovalStatus]?: { color: string; icon: React.Elem
   removido: { color: 'indigo', icon: CheckCircle, label: 'Removido' },
   finalizada: { color: 'gray', icon: CheckCircle, label: 'Finalizada' },
   aguardando_baixa_master: { color: 'cyan', icon: Send, label: 'Aguardando Master' },
+  aguardando_financeiro_junior: { color: 'orange', icon: FileWarning, label: 'Aguardando Fin. Jr.' },
 };
 
 const RemovalCard: React.FC<RemovalCardProps> = ({ removal, onClick }) => {
+  const { user } = useAuth();
+
+  const isContactedByFinance = user?.role === 'financeiro_junior' && removal.contactedByFinance;
+
   const config = statusConfig[removal.status] || { color: 'gray', icon: Files, label: 'Desconhecido' };
   const Icon = config.icon;
+
+  const displayColor = isContactedByFinance ? 'green' : config.color;
 
   return (
     <div 
       className="bg-white rounded-lg shadow-md p-4 border-l-4 transition-all hover:shadow-lg hover:border-l-8 cursor-pointer" 
-      style={{ borderColor: config.color }}
+      style={{ borderColor: displayColor }}
       onClick={onClick}
     >
       <div className="flex justify-between items-start">
@@ -38,7 +46,7 @@ const RemovalCard: React.FC<RemovalCardProps> = ({ removal, onClick }) => {
           <p className="text-sm text-gray-600">Tutor: {removal.tutor.name}</p>
           <p className="text-xs text-gray-400">Código: {removal.code}</p>
         </div>
-        <div className={`flex items-center text-sm font-medium text-${config.color}-600 bg-${config.color}-100 px-2 py-1 rounded-full`}>
+        <div className={`flex items-center text-sm font-medium text-${displayColor}-600 bg-${displayColor}-100 px-2 py-1 rounded-full`}>
           <Icon className="h-4 w-4 mr-1" />
           {config.label}
         </div>

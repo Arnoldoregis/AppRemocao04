@@ -18,7 +18,7 @@ const IncluirRemocaoModal: React.FC<IncluirRemocaoModalProps> = ({ slotKey, onCl
     const scheduledCodes = Object.values(schedule).map(r => r.code);
     return removals.filter(r =>
       (r.modality === 'individual_ouro' || r.modality === 'individual_prata') &&
-      r.status === 'concluida' &&
+      r.status === 'aguardando_financeiro_junior' &&
       !scheduledCodes.includes(r.code) &&
       (
         r.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,7 +72,7 @@ const IncluirRemocaoModal: React.FC<IncluirRemocaoModalProps> = ({ slotKey, onCl
             </ul>
           ) : (
             <div className="text-center p-8 text-gray-500">
-              Nenhuma remoção individual disponível para agendamento de despedida.
+              Nenhuma remoção individual liberada pelo operacional foi encontrada.
             </div>
           )}
         </div>

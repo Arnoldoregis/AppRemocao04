@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Removal } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useRemovals } from '../context/RemovalContext';
 import ReceptorActions from './actions/ReceptorActions';
 import MotoristaActions from './actions/MotoristaActions';
 import FinanceiroJuniorActions from './actions/FinanceiroJuniorActions';
 import FinanceiroMasterActions from './actions/FinanceiroMasterActions';
 import ClinicaActions from './actions/ClinicaActions';
 import OperacionalActions from './actions/OperacionalActions';
-import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4 } from 'lucide-react';
+import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4, Flame } from 'lucide-react';
 import { format } from 'date-fns';
 import { downloadFile } from '../utils/downloadFile';
 import { priceTable } from '../data/pricing';
@@ -33,8 +34,9 @@ const DetailItem: React.FC<{ label: string; value?: string | number | null }> = 
 
 const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onClose }) => {
   const { user } = useAuth();
+  const { updateRemoval } = useRemovals();
   const [isEditing, setIsEditing] = useState(false);
-  const [activeEditTab, setActiveEditTab] = useState<'add' | 'adjust' | 'change_modality'>('add');
+  const [activeEditTab, setActiveEditTab] = useState<'add' | 'adjust' | 'change_modality' | 'cremation'>('add');
 
   const getWeightKeyFromRealWeight = (weight: number): keyof typeof priceTable | null => {
     if (weight <= 5) return '0-5kg';
@@ -96,6 +98,11 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
   const handleWhatsAppClick = (phone: string) => {
     const phoneNumber = phone.replace(/\D/g, '');
     window.open(`https://wa.me/55${phoneNumber}`, '_blank', 'noopener,noreferrer');
+
+    // Se o usuário for financeiro junior e a remoção não tiver sido marcada, atualize-a.
+    if (user?.role === 'financeiro_junior' && removal && !removal.contactedByFinance) {
+      updateRemoval(removal.code, { contactedByFinance: true });
+    }
   };
 
   const handleGpsClick = (address: string) => {
@@ -194,8 +201,22 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
 
           {(removal.petCondition || removal.farewellSchedulingInfo) && (
             <DetailSection title="Detalhes Operacionais" icon={Info}>
-              <DetailItem label="Condição do Pet" value={removal.petCondition} />
-              <DetailItem label="Agendamento de Despedida" value={removal.farewellSchedulingInfo} />
+              {removal.petCondition && (
+                <div className="space-y-1">
+                  <p className="font-semibold text-gray-600">Condição do Pet:</p>
+                  <blockquote className={`p-3 rounded-md border-l-4 ${user?.role === 'financeiro_junior' ? 'bg-green-50 border-green-500 text-green-900' : 'bg-gray-50 border-gray-300'}`}>
+                    {removal.petCondition}
+                  </blockquote>
+                </div>
+              )}
+              {removal.farewellSchedulingInfo && (
+                <div className="space-y-1 mt-3">
+                  <p className="font-semibold text-gray-600">Informações para Agendamento de Despedida:</p>
+                  <blockquote className={`p-3 rounded-md border-l-4 ${user?.role === 'financeiro_junior' ? 'bg-green-50 border-green-500 text-green-900' : 'bg-gray-50 border-gray-300'}`}>
+                    {removal.farewellSchedulingInfo}
+                  </blockquote>
+                </div>
+              )}
             </DetailSection>
           )}
 
@@ -347,6 +368,11 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
             )}
 
           </DetailSection>
+
+          <DetailSection title="Dados da Cremação" icon={Flame}>
+            <DetailItem label="Data da Cremação" value={removal.cremationDate ? format(new Date(removal.cremationDate), 'dd/MM/yyyy') : 'Não definida'} />
+            <DetailItem label="Observações para o Certificado" value={removal.certificateObservations} />
+          </DetailSection>
           
           <DetailSection title="Outras Informações" icon={FileText}>
              <DetailItem label="Observações" value={removal.observations} />
@@ -355,24 +381,29 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
 
           <DetailSection title="Histórico de Alterações" icon={History}>
             <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
-              {removal.history.map((item, index) => (
-                <li key={index} className="flex items-start">
-                  <Clock className="h-4 w-4 mr-2 text-gray-500 mt-1 flex-shrink-0" />
-                  <div>
-                    <span className="font-semibold">{item.action}</span> em {format(new Date(item.date), 'dd/MM/yyyy HH:mm')}
-                    {item.reason && <p className="text-xs text-gray-500 pl-1">Motivo: {item.reason}</p>}
-                    {item.proofUrl && (
-                        <button
-                            onClick={() => downloadFile(item.proofUrl!, item.proofUrl!)}
-                            className="text-xs text-blue-500 hover:underline flex items-center gap-1 mt-1"
-                        >
-                            <Download size={12} />
-                            Baixar Comprovante Associado
-                        </button>
-                    )}
-                  </div>
-                </li>
-              ))}
+              {removal.history.map((item, index) => {
+                const actionText = item.action;
+                const isCremationDateAction = actionText.includes('data de cremação');
+
+                return (
+                  <li key={index} className="flex items-start">
+                    <Clock className="h-4 w-4 mr-2 text-gray-500 mt-1 flex-shrink-0" />
+                    <div>
+                      <span className={`font-semibold ${isCremationDateAction ? 'text-red-600' : ''}`}>{actionText}</span> em {format(new Date(item.date), 'dd/MM/yyyy HH:mm')}
+                      {item.reason && <p className="text-xs text-gray-500 pl-1">Motivo: {item.reason}</p>}
+                      {item.proofUrl && (
+                          <button
+                              onClick={() => downloadFile(item.proofUrl!, item.proofUrl!)}
+                              className="text-xs text-blue-500 hover:underline flex items-center gap-1 mt-1"
+                          >
+                              <Download size={12} />
+                              Baixar Comprovante Associado
+                          </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </DetailSection>
         </div>

@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
+import { useAgenda } from '../context/AgendaContext';
 import Layout from '../components/Layout';
-import { CalendarDays, Download, Search } from 'lucide-react';
+import { CalendarDays, Download, Search, Filter } from 'lucide-react';
 import { Removal } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
@@ -10,10 +11,12 @@ import { exportToExcel } from '../utils/exportToExcel';
 
 const FinanceiroJuniorHome: React.FC = () => {
   const { removals } = useRemovals();
+  const { schedule } = useAgenda();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<string>('coletivo_pago');
+  const [activeTab, setActiveTab] = useState<string>('coletivas');
   const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState<'todos' | 'convencional' | 'faturado'>('todos');
 
   useEffect(() => {
     if (selectedRemoval) {
@@ -24,31 +27,41 @@ const FinanceiroJuniorHome: React.FC = () => {
     }
   }, [removals, selectedRemoval?.code]);
 
+  useEffect(() => {
+    setPaymentFilter('todos');
+  }, [activeTab]);
+
   const filteredRemovals = useMemo(() => {
     let baseFiltered: Removal[] = [];
+    
+    // Main category filtering
     switch (activeTab) {
-        case 'coletivo_pago':
-          baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality === 'coletivo' && r.paymentMethod !== 'faturado');
-          break;
-        case 'coletivo_faturado':
-          baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality === 'coletivo' && r.paymentMethod === 'faturado');
-          break;
-        case 'individual_pago':
-          baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality !== 'coletivo' && r.paymentMethod !== 'faturado');
-          break;
-        case 'individual_faturado':
-          baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality !== 'coletivo' && r.paymentMethod === 'faturado');
-          break;
-        case 'finalizadas_pago':
-          baseFiltered = removals.filter(r => r.status === 'aguardando_baixa_master' && r.paymentMethod !== 'faturado');
-          break;
-        case 'finalizadas_faturado':
-          baseFiltered = removals.filter(r => r.status === 'aguardando_baixa_master' && r.paymentMethod === 'faturado');
-          break;
+        case 'coletivas':
+            baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality === 'coletivo');
+            break;
+        case 'individuais':
+            baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality !== 'coletivo');
+            break;
+        case 'agendado_despedida':
+            baseFiltered = Object.values(schedule);
+            break;
+        case 'finalizadas':
+            baseFiltered = removals.filter(r => r.status === 'aguardando_baixa_master');
+            break;
         default:
-          baseFiltered = [];
+            baseFiltered = [];
     }
 
+    // Payment method sub-filtering
+    if (paymentFilter !== 'todos' && activeTab !== 'agendado_despedida') {
+        if (paymentFilter === 'faturado') {
+            baseFiltered = baseFiltered.filter(r => r.paymentMethod === 'faturado');
+        } else { // 'convencional'
+            baseFiltered = baseFiltered.filter(r => r.paymentMethod !== 'faturado');
+        }
+    }
+
+    // Search term filtering
     if (searchTerm) {
         const lowerCaseSearch = searchTerm.toLowerCase();
         return baseFiltered.filter(r =>
@@ -59,19 +72,23 @@ const FinanceiroJuniorHome: React.FC = () => {
     }
 
     return baseFiltered;
-  }, [activeTab, removals, searchTerm]);
+  }, [activeTab, removals, searchTerm, schedule, paymentFilter]);
 
   const handleDownload = () => {
     exportToExcel(filteredRemovals, `historico_fin_junior_${activeTab}`);
   };
 
   const tabs = [
-    { id: 'coletivo_pago', label: 'Remoção Coletivo' },
-    { id: 'coletivo_faturado', label: 'Remoção Coletivo Faturado' },
-    { id: 'individual_pago', label: 'Remoção Individual' },
-    { id: 'individual_faturado', label: 'Remoção Individual Faturado' },
-    { id: 'finalizadas_pago', label: 'Finalizadas' },
-    { id: 'finalizadas_faturado', label: 'Finalizadas Faturado Mensal' },
+    { id: 'coletivas', label: 'Coletivas/Faturado' },
+    { id: 'individuais', label: 'Individuais/Faturado' },
+    { id: 'agendado_despedida', label: 'Agendado Despedida' },
+    { id: 'finalizadas', label: 'Finalizadas' },
+  ];
+
+  const paymentFilters = [
+    { id: 'todos' as const, label: 'Todos' },
+    { id: 'convencional' as const, label: 'Pag. Convencional' },
+    { id: 'faturado' as const, label: 'Pag. Faturado' },
   ];
 
   return (
@@ -114,6 +131,23 @@ const FinanceiroJuniorHome: React.FC = () => {
             ))}
           </nav>
         </div>
+        
+        {['coletivas', 'individuais', 'finalizadas'].includes(activeTab) && (
+            <div className="p-4 border-b flex items-center justify-center gap-2 bg-gray-50">
+                <Filter className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-semibold text-gray-600 mr-2">Filtrar por pagamento:</span>
+                {paymentFilters.map(filter => (
+                    <button 
+                        key={filter.id}
+                        onClick={() => setPaymentFilter(filter.id)} 
+                        className={`px-3 py-1 text-xs rounded-full transition-colors ${paymentFilter === filter.id ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                        {filter.label}
+                    </button>
+                ))}
+            </div>
+        )}
+
         <div className="p-6">
           {filteredRemovals.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
