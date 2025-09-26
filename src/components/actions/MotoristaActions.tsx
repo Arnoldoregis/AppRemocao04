@@ -14,6 +14,7 @@ const MotoristaActions: React.FC<MotoristaActionsProps> = ({ removal, onClose })
   const { user } = useAuth();
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [realWeight, setRealWeight] = useState('');
+  const [isConfirmingWeight, setIsConfirmingWeight] = useState(false);
 
   const handleUpdateStatus = (newStatus: Removal['status'], actionText: string) => {
     if (!user) return;
@@ -47,6 +48,28 @@ const MotoristaActions: React.FC<MotoristaActionsProps> = ({ removal, onClose })
     });
     onClose();
   };
+
+  const handleConfirmWeightClick = () => {
+    if (!realWeight || parseFloat(realWeight) <= 0) {
+      alert('Por favor, informe um peso válido.');
+      return;
+    }
+    setIsConfirmingWeight(true);
+  };
+
+  if (isConfirmingWeight) {
+    return (
+      <div className="w-full p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+        <h4 className="font-semibold text-yellow-900 mb-3 text-center">
+          Tem certeza que deseja confirmar o peso informado de {realWeight} kg?
+        </h4>
+        <div className="flex gap-2">
+          <button onClick={() => setIsConfirmingWeight(false)} className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400">NÃO</button>
+          <button onClick={handleFinalize} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">SIM</button>
+        </div>
+      </div>
+    );
+  }
   
   if (isFinalizing) {
       return (
@@ -58,7 +81,7 @@ const MotoristaActions: React.FC<MotoristaActionsProps> = ({ removal, onClose })
                 placeholder="Peso real (kg)"
                 className="px-3 py-2 border border-gray-300 rounded-md w-32"
             />
-            <button onClick={handleFinalize} className="px-4 py-2 bg-green-600 text-white rounded-md">Confirmar</button>
+            <button onClick={handleConfirmWeightClick} className="px-4 py-2 bg-green-600 text-white rounded-md">Confirmar</button>
             <button onClick={() => setIsFinalizing(false)} className="px-4 py-2 bg-gray-300 rounded-md">Voltar</button>
         </div>
       );

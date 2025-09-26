@@ -8,7 +8,7 @@ import FinanceiroJuniorActions from './actions/FinanceiroJuniorActions';
 import FinanceiroMasterActions from './actions/FinanceiroMasterActions';
 import ClinicaActions from './actions/ClinicaActions';
 import OperacionalActions from './actions/OperacionalActions';
-import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4, Flame } from 'lucide-react';
+import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4, Flame, Building } from 'lucide-react';
 import { format } from 'date-fns';
 import { downloadFile } from '../utils/downloadFile';
 import { priceTable } from '../data/pricing';
@@ -370,6 +370,7 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
           </DetailSection>
 
           <DetailSection title="Dados da Cremação" icon={Flame}>
+            <DetailItem label="Empresa de Cremação" value={removal.cremationCompany} />
             <DetailItem label="Data da Cremação" value={removal.cremationDate ? format(new Date(removal.cremationDate), 'dd/MM/yyyy') : 'Não definida'} />
             <DetailItem label="Observações para o Certificado" value={removal.certificateObservations} />
           </DetailSection>
@@ -384,13 +385,14 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
               {removal.history.map((item, index) => {
                 const actionText = item.action;
                 const isCremationDateAction = actionText.includes('data de cremação');
+                const isCancellationAction = actionText.toLowerCase().includes('cancelada') && item.reason;
 
                 return (
                   <li key={index} className="flex items-start">
                     <Clock className="h-4 w-4 mr-2 text-gray-500 mt-1 flex-shrink-0" />
                     <div>
-                      <span className={`font-semibold ${isCremationDateAction ? 'text-red-600' : ''}`}>{actionText}</span> em {format(new Date(item.date), 'dd/MM/yyyy HH:mm')}
-                      {item.reason && <p className="text-xs text-gray-500 pl-1">Motivo: {item.reason}</p>}
+                      <span className={`font-semibold ${isCremationDateAction || isCancellationAction ? 'text-red-600' : ''}`}>{actionText}</span> em {format(new Date(item.date), 'dd/MM/yyyy HH:mm')}
+                      {item.reason && <p className={`text-xs pl-1 ${isCancellationAction ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>Motivo: {item.reason}</p>}
                       {item.proofUrl && (
                           <button
                               onClick={() => downloadFile(item.proofUrl!, item.proofUrl!)}

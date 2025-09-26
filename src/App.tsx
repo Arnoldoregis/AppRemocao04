@@ -16,6 +16,9 @@ import FuncionarioDashboard from './pages/FuncionarioDashboard';
 import RegisterFuncionario from './pages/RegisterFuncionario';
 import ResetPassword from './pages/ResetPassword';
 import AgendaDespedida from './pages/AgendaDespedida';
+import CremadorDashboardPage from './pages/CremadorDashboardPage';
+import ReceptorSolicitarRemocaoPF from './pages/ReceptorSolicitarRemocaoPF';
+import ReceptorSolicitarRemocaoClinica from './pages/ReceptorSolicitarRemocaoClinica';
 
 // Componente para rotas protegidas
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -71,6 +74,21 @@ function App() {
                   <Route path="/agenda-despedida" element={
                     <ProtectedRoute>
                       <AgendaDespedida />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/painel-cremador" element={
+                    <ProtectedRoute>
+                      <CremadorDashboardPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/receptor/solicitar-remocao-pf" element={
+                    <ProtectedRoute>
+                      <ReceptorSolicitarRemocaoPF />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/receptor/solicitar-remocao-clinica" element={
+                    <ProtectedRoute>
+                      <ReceptorSolicitarRemocaoClinica />
                     </ProtectedRoute>
                   } />
                 </Routes>

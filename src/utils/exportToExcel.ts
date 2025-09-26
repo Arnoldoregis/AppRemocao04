@@ -1,8 +1,12 @@
-import { Removal } from '../types';
+import { Removal, CremationBatch } from '../types';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
 export const exportToExcel = (removals: Removal[], fileName: string) => {
+  if (removals.length === 0) {
+    alert('Não há dados para exportar.');
+    return;
+  }
   const formattedData = removals.map(r => ({
     'Código': r.code,
     'Data Solicitação': format(new Date(r.createdAt), 'dd/MM/yyyy HH:mm'),
@@ -29,6 +33,38 @@ export const exportToExcel = (removals: Removal[], fileName: string) => {
 
   // Auto-ajustar a largura das colunas
   const colWidths = Object.keys(formattedData[0] || {}).map(key => ({
+    wch: Math.max(
+      key.length,
+      ...formattedData.map(row => (row[key as keyof typeof row] || '').toString().length)
+    ) + 2
+  }));
+  worksheet['!cols'] = colWidths;
+
+  XLSX.writeFile(workbook, `${fileName}.xlsx`);
+};
+
+export const exportCremationHistoryToExcel = (batches: CremationBatch[], fileName: string) => {
+  const formattedData = batches.flatMap(batch => 
+    batch.items.map(item => ({
+      'Lote ID': batch.id,
+      'Data Fim Cremação': batch.finishedAt ? format(new Date(batch.finishedAt), 'dd/MM/yyyy HH:mm') : 'Em andamento',
+      'Nome do Pet': item.petName,
+      'Código Remoção': item.removalCode,
+      'Peso (kg)': item.weight.toFixed(2),
+      'Posição no Forno': item.position.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    }))
+  );
+
+  if (formattedData.length === 0) {
+    alert('Nenhuma cremação finalizada na semana para exportar.');
+    return;
+  }
+
+  const worksheet = XLSX.utils.json_to_sheet(formattedData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Histórico de Cremação');
+
+  const colWidths = Object.keys(formattedData[0]).map(key => ({
     wch: Math.max(
       key.length,
       ...formattedData.map(row => (row[key as keyof typeof row] || '').toString().length)

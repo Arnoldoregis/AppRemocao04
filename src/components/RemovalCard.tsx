@@ -1,7 +1,7 @@
 import React from 'react';
 import { Removal, RemovalStatus } from '../types';
 import { format } from 'date-fns';
-import { List, Clock, CheckCircle, FileWarning, FileCheck, XCircle, Files, Eye, Send } from 'lucide-react';
+import { List, Clock, CheckCircle, FileWarning, FileCheck, XCircle, Files, Eye, Send, Flame } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface RemovalCardProps {
@@ -22,6 +22,7 @@ const statusConfig: { [key in RemovalStatus]?: { color: string; icon: React.Elem
   finalizada: { color: 'gray', icon: CheckCircle, label: 'Finalizada' },
   aguardando_baixa_master: { color: 'cyan', icon: Send, label: 'Aguardando Master' },
   aguardando_financeiro_junior: { color: 'orange', icon: FileWarning, label: 'Aguardando Fin. Jr.' },
+  cremado: { color: 'gray', icon: Flame, label: 'Cremado' },
 };
 
 const RemovalCard: React.FC<RemovalCardProps> = ({ removal, onClick }) => {

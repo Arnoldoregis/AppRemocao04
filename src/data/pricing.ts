@@ -41,3 +41,10 @@ export const adicionaisDisponiveis = [
     { type: 'relicario' as const, label: 'Relicário', value: 200 },
     { type: 'carteirinha_pelinho' as const, label: 'Carteirinha com pelinho', value: 50 }
 ];
+
+export const collectiveAdditionals = [
+    { id: 'carteirinha', name: 'CARTEIRINHA COM PELINHO', value: 50 },
+    { id: 'patinha', name: 'PATINHA', value: 150 },
+    { id: 'relicario', name: 'RELICÁRIO', value: 200 },
+    { id: 'pingente', name: 'PINGENTE EM RESINA', value: 250 },
+];

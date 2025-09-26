@@ -41,7 +41,9 @@ export type RemovalStatus =
   | 'aguardando_pagamento'// Financeiro Master gerou boleto
   | 'pagamento_concluido' // Cliente pagou boleto / Fin Master confirmou
   | 'cancelada'           // Cancelado em alguma etapa
-  | 'finalizada'          // Ciclo encerrado pelo Financeiro
+  | 'finalizada'          // Ciclo encerrado pelo Financeiro / Liberado para cremação pelo Operacional
+  | 'em_lote_cremacao'    // Adicionado a um lote de cremação, aguardando início
+  | 'cremado'             // Cremador marcou como cremado
   | 'aguardando_boleto'   // Status para a visão da clínica
   | 'coletivo_pago'
   | 'individual_pago'
@@ -81,6 +83,7 @@ export interface Removal {
   assignedDriver?: {
     id: string;
     name: string;
+    phone?: string;
   };
   boletoUrl?: string;
   comprovanteFaturaUrl?: string;
@@ -88,6 +91,7 @@ export interface Removal {
   petCondition?: string;
   farewellSchedulingInfo?: string;
   cremationDate?: string;
+  cremationCompany?: 'PETCÈU' | 'SQP';
   certificateObservations?: string;
   contactedByFinance?: boolean;
 }
@@ -147,4 +151,21 @@ export interface Conversation {
 
 export interface FarewellSchedule {
   [slotKey: string]: Removal; // key is "YYYY-MM-DD-HH:mm" or "YYYY-MM-DD-ENCAIXE EMERGÊNCIA"
+}
+
+export type CremationPosition = 'frente' | 'meio/frente' | 'meio' | 'meio/fundo' | 'fundo';
+
+export interface CremationBatchItem {
+  removalCode: string;
+  petName: string;
+  weight: number;
+  position: CremationPosition;
+}
+
+export interface CremationBatch {
+  id: string;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  items: CremationBatchItem[];
 }

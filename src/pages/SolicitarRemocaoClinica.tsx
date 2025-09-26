@@ -41,7 +41,6 @@ const SolicitarRemocaoClinica: React.FC = () => {
   const [showPagamentoInfo, setShowPagamentoInfo] = useState(false);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
 
-  // Lista de pagamentos para Clínica (com 'Faturado')
   const paymentOptions = [
     { value: 'faturado', label: 'Faturado' },
     { value: 'debito', label: 'Cartão de Débito' },
@@ -57,12 +56,20 @@ const SolicitarRemocaoClinica: React.FC = () => {
       let valorBase = 0;
       if (formData.petPeso && formData.modalidade) {
         const pesoKey = formData.petPeso as keyof typeof priceTable;
-        if (priceTable[pesoKey] && priceTable[pesoKey][formData.modalidade]) {
+        if (priceTable[pesoKey]?.[formData.modalidade]) {
           valorBase = priceTable[pesoKey][formData.modalidade];
         }
       }
       const valorAdicionais = adicionais.reduce((total, ad) => total + (ad.value * ad.quantity), 0);
-      setValorTotal(valorBase + valorAdicionais);
+      
+      let finalTotal = valorBase + valorAdicionais;
+
+      if (formData.modalidade === 'individual_ouro' && adicionais.some(ad => ad.type === 'patinha_resina' && ad.quantity > 0)) {
+          const patinhaPrice = adicionaisDisponiveis.find(ad => ad.type === 'patinha_resina')?.value || 0;
+          finalTotal -= patinhaPrice;
+      }
+
+      setValorTotal(finalTotal);
     };
     calcularValorTotal();
   }, [formData.petPeso, formData.modalidade, adicionais]);
@@ -221,18 +228,18 @@ const SolicitarRemocaoClinica: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Adicionais</h3>
               <div className="space-y-4">
                 {adicionaisDisponiveis.map((ad) => (
-                  <div key={ad.type} className={`flex items-center justify-between p-4 border rounded-lg ${isPatinhaInclusa && ad.type === 'patinha_resina' ? 'bg-gray-100' : 'border-gray-200'}`}>
+                  <div key={ad.type} className={`flex items-center justify-between p-4 border rounded-lg ${isPatinhaInclusa && ad.type === 'patinha_resina' ? 'bg-gray-50 border-green-200' : 'border-gray-200'}`}>
                     <div>
                         <span className="font-medium">{ad.label}</span>
                         <span className="text-green-600 ml-2">R$ {ad.value},00</span>
                         {isPatinhaInclusa && ad.type === 'patinha_resina' && (
-                            <span className="ml-3 text-xs font-bold text-white bg-green-500 px-2 py-0.5 rounded-full">Incluso</span>
+                            <span className="ml-3 text-xs font-bold text-white bg-green-500 px-2 py-0.5 rounded-full">1ª Grátis</span>
                         )}
                     </div>
                     <div className="flex items-center space-x-3">
-                      <button type="button" onClick={() => handleAdicionalChange(ad.type, Math.max(0, getAdicionalQuantity(ad.type) - 1))} className="p-1 rounded-full bg-red-100 text-red-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isPatinhaInclusa && ad.type === 'patinha_resina'}><Minus className="h-4 w-4" /></button>
-                      <span className="w-8 text-center">{isPatinhaInclusa && ad.type === 'patinha_resina' ? 1 : getAdicionalQuantity(ad.type)}</span>
-                      <button type="button" onClick={() => handleAdicionalChange(ad.type, Math.min(15, getAdicionalQuantity(ad.type) + 1))} className="p-1 rounded-full bg-green-100 text-green-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isPatinhaInclusa && ad.type === 'patinha_resina'}><Plus className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => handleAdicionalChange(ad.type, Math.max(0, getAdicionalQuantity(ad.type) - 1))} className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200"><Minus className="h-4 w-4" /></button>
+                      <span className="w-8 text-center">{getAdicionalQuantity(ad.type)}</span>
+                      <button type="button" onClick={() => handleAdicionalChange(ad.type, Math.min(15, getAdicionalQuantity(ad.type) + 1))} className="p-1 rounded-full bg-green-100 text-green-600 hover:bg-green-200"><Plus className="h-4 w-4" /></button>
                     </div>
                   </div>
                 ))}
@@ -319,18 +326,8 @@ const SolicitarRemocaoClinica: React.FC = () => {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Solicitar Remoção</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="relative cursor-pointer">
-                  <input type="radio" name="tipoSolicitacao" value="agora" checked={formData.tipoSolicitacao === 'agora'} onChange={handleInputChange} className="sr-only" />
-                  <div className={`p-4 rounded-lg border-2 text-center transition-all ${formData.tipoSolicitacao === 'agora' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                    <span className="font-medium">Solicitar Agora</span>
-                  </div>
-                </label>
-                <label className="relative cursor-pointer">
-                  <input type="radio" name="tipoSolicitacao" value="agendar" checked={formData.tipoSolicitacao === 'agendar'} onChange={handleInputChange} className="sr-only" />
-                  <div className={`p-4 rounded-lg border-2 text-center transition-all ${formData.tipoSolicitacao === 'agendar' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                    <span className="font-medium">Agendar Remoção</span>
-                  </div>
-                </label>
+                <label className="relative cursor-pointer"><input type="radio" name="tipoSolicitacao" value="agora" checked={formData.tipoSolicitacao === 'agora'} onChange={handleInputChange} className="sr-only" /><div className={`p-4 rounded-lg border-2 text-center transition-all ${formData.tipoSolicitacao === 'agora' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}><span className="font-medium">Solicitar Agora</span></div></label>
+                <label className="relative cursor-pointer"><input type="radio" name="tipoSolicitacao" value="agendar" checked={formData.tipoSolicitacao === 'agendar'} onChange={handleInputChange} className="sr-only" /><div className={`p-4 rounded-lg border-2 text-center transition-all ${formData.tipoSolicitacao === 'agendar' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}><span className="font-medium">Agendar Remoção</span></div></label>
               </div>
 
               {formData.tipoSolicitacao === 'agendar' && (

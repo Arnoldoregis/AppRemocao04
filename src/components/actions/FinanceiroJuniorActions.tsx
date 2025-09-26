@@ -3,8 +3,9 @@ import { Removal, CustomAdditional } from '../../types';
 import { useRemovals } from '../../context/RemovalContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAgenda } from '../../context/AgendaContext';
-import { CheckCircle, Edit, Upload, Plus, Trash2, Save, Flame } from 'lucide-react';
-import { priceTable } from '../../data/pricing';
+import { CheckCircle, Edit, Upload, Plus, Trash2, Save, Flame, Minus, Undo, Building, Award } from 'lucide-react';
+import { priceTable, collectiveAdditionals } from '../../data/pricing';
+import CertificateModal from '../modals/CertificateModal';
 
 interface FinanceiroJuniorActionsProps {
   removal: Removal;
@@ -27,30 +28,30 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const { user } = useAuth();
   const { schedule } = useAgenda();
   
-  // State for "Adicionar" tab
+  // States
   const [items, setItems] = useState<CustomAdditional[]>([]);
   const [productName, setProductName] = useState('');
   const [productValue, setProductValue] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
-  // State for "Abater" tab
   const [adjustmentType, setAdjustmentType] = useState<'receber' | 'devolver'>('receber');
   const [adjustmentValue, setAdjustmentValue] = useState('');
   const [adjustmentProof, setAdjustmentProof] = useState<File | null>(null);
-
-  // State for "Alterar Modalidade" tab
   const [newModality, setNewModality] = useState<Removal['modality']>(removal.modality);
   const [modalityDifference, setModalityDifference] = useState(0);
   const [modalityProof, setModalityProof] = useState<File | null>(null);
-
-  // State for "Dados Cremação" tab
+  const [cremationCompany, setCremationCompany] = useState<Removal['cremationCompany'] | undefined>(undefined);
   const [cremationDate, setCremationDate] = useState('');
   const [certificateObs, setCertificateObs] = useState('');
+  const [isConfirmingFinalization, setIsConfirmingFinalization] = useState(false);
+  const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
+
+  const isCollective = removal.modality === 'coletivo';
 
   useEffect(() => {
     if (isEditing) {
       setItems(removal.customAdditionals || []);
       setNewModality(removal.modality);
+      setCremationCompany(removal.cremationCompany);
       setCremationDate(removal.cremationDate || '');
       setCertificateObs(removal.certificateObservations || '');
     }
@@ -85,36 +86,33 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
   const resetAndCloseEdit = () => {
     setIsEditing(false);
-    setProductName('');
-    setProductValue('');
-    setSelectedFile(null);
-    setAdjustmentValue('');
-    setAdjustmentProof(null);
-    setNewModality(removal.modality);
-    setModalityDifference(0);
-    setModalityProof(null);
-    setCremationDate('');
-    setCertificateObs('');
+    setProductName(''); setProductValue(''); setSelectedFile(null);
+    setAdjustmentValue(''); setAdjustmentProof(null);
+    setNewModality(removal.modality); setModalityDifference(0); setModalityProof(null);
+    setCremationCompany(undefined); setCremationDate(''); setCertificateObs('');
   };
 
-  const handleFinalizeForMaster = () => {
+  const handleConfirmFinalization = () => {
     if (!user) return;
-
+    if (!removal.cremationCompany) {
+      alert('Por favor, defina a empresa de cremação (PETCÈU ou SQP) na aba "Dados Cremação" antes de finalizar.');
+      setIsConfirmingFinalization(false);
+      return;
+    }
     const isScheduled = Object.values(schedule).some(scheduledRemoval => scheduledRemoval.code === removal.code);
-    const actionText = isScheduled
-      ? `finalizou e enviou para o Financeiro Master com despedida agendada`
-      : `finalizou e enviou para o Financeiro Master sem despedida agendada`;
-
+    const farewellText = isScheduled ? `com despedida agendada` : `sem despedida agendada`;
     updateRemoval(removal.code, {
       status: 'aguardando_baixa_master',
-      history: [
-        ...removal.history,
-        {
-          date: new Date().toISOString(),
-          action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionText}`,
-          user: user.name,
-        },
-      ],
+      history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} finalizou e enviou para o Financeiro Master (${removal.cremationCompany}) ${farewellText}`, user: user.name }],
+    });
+    onClose();
+  };
+
+  const handleReturnToOperational = () => {
+    if (!user) return;
+    updateRemoval(removal.code, {
+      status: 'aguardando_baixa_master',
+      history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} retornou a remoção para o Operacional.`, user: user.name }],
     });
     onClose();
   };
@@ -122,28 +120,14 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const handleAddItem = () => {
     if (productName && productValue && items.length < 10) {
       const processAndAddItem = (proofString?: string) => {
-        const newItem: CustomAdditional = {
-          id: new Date().toISOString(),
-          name: productName,
-          value: parseFloat(productValue),
-          paymentProof: proofString,
-        };
-        setItems([...items, newItem]);
-        setProductName('');
-        setProductValue('');
-        setSelectedFile(null);
+        setItems([...items, { id: new Date().toISOString(), name: productName, value: parseFloat(productValue), paymentProof: proofString }]);
+        setProductName(''); setProductValue(''); setSelectedFile(null);
         const fileInput = document.getElementById('custom-product-file-input') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
       };
-  
       if (selectedFile) {
         const reader = new FileReader();
-        reader.onload = (e) => {
-          const dataUrl = e.target?.result as string;
-          // Concatenamos a data URL e o nome do arquivo para uso posterior
-          const proofString = `${dataUrl}||${selectedFile.name}`;
-          processAndAddItem(proofString);
-        };
+        reader.onload = (e) => processAndAddItem(`${e.target?.result as string}||${selectedFile.name}`);
         reader.readAsDataURL(selectedFile);
       } else {
         processAndAddItem();
@@ -151,44 +135,65 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     }
   };
 
-  const handleRemoveItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
+  const handleCollectiveAddItem = (product: { name: string; value: number }) => {
+    setItems(prev => [...prev, { id: new Date().toISOString() + Math.random(), name: product.name, value: product.value }]);
   };
 
-  const handleSaveItems = () => {
+  const handleCollectiveRemoveItem = (productName: string) => {
+    setItems(prev => {
+      const itemIndex = prev.findLastIndex(item => item.name === productName);
+      if (itemIndex > -1) {
+        const newItems = [...prev];
+        newItems.splice(itemIndex, 1);
+        return newItems;
+      }
+      return prev;
+    });
+  };
+
+  const handleRemoveItem = (id: string) => setItems(items.filter(item => item.id !== id));
+
+  const handleSaveItems = async () => {
     if (!user) return;
+    let proofString: string | undefined = undefined;
+    if (isCollective && selectedFile) {
+        proofString = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(`${e.target?.result as string}||${selectedFile.name}`);
+            reader.readAsDataURL(selectedFile);
+        });
+    }
     const originalItems = removal.customAdditionals || [];
-    const addedItems = items.filter(i => !originalItems.some(oi => oi.id === i.id));
-    const removedItems = originalItems.filter(oi => !items.some(i => i.id === oi.id));
-    
+    const processedItems = isCollective ? items.map(item => !originalItems.some(oi => oi.id === item.id) && proofString ? { ...item, paymentProof: proofString } : item) : items;
+    const addedItems = processedItems.filter(i => !originalItems.some(oi => oi.id === oi.id));
+    const removedItems = originalItems.filter(oi => !processedItems.some(i => i.id === oi.id));
     let historyActions: string[] = [];
-
     if (addedItems.length > 0) {
-      const itemsSummary = addedItems.map(i => 
-        `${i.name} (R$ ${i.value.toFixed(2)})${i.paymentProof ? ` [comprovante anexado]` : ''}`
-      ).join(', ');
-      historyActions.push(`adicionou: ${itemsSummary}`);
+        const summary = new Map<string, { count: number, hasProof: boolean, value: number }>();
+        addedItems.forEach(item => {
+            const existing = summary.get(item.name) || { count: 0, hasProof: false, value: 0 };
+            existing.count++; existing.hasProof = existing.hasProof || !!item.paymentProof; existing.value = item.value;
+            summary.set(item.name, existing);
+        });
+        const itemsSummary = Array.from(summary.entries()).map(([name, data]) => `${data.count}x ${name} (R$ ${(data.value * data.count).toFixed(2)})${data.hasProof ? ` [comprovante anexado]` : ''}`).join(', ');
+        historyActions.push(`adicionou: ${itemsSummary}`);
     }
-
     if (removedItems.length > 0) {
-      const itemsSummary = removedItems.map(i => `${i.name} (R$ ${i.value.toFixed(2)})`).join(', ');
-      historyActions.push(`removeu: ${itemsSummary}`);
+        const summary = new Map<string, { count: number, value: number }>();
+        removedItems.forEach(item => {
+            const existing = summary.get(item.name) || { count: 0, value: 0 };
+            existing.count++; existing.value = item.value;
+            summary.set(item.name, existing);
+        });
+        const itemsSummary = Array.from(summary.entries()).map(([name, data]) => `${data.count}x ${name}`).join(', ');
+        historyActions.push(`removeu: ${itemsSummary}`);
     }
-
     if (historyActions.length > 0) {
-      const totalOriginalValue = originalItems.reduce((acc, item) => acc + item.value, 0);
-      const totalNewValue = items.reduce((acc, item) => acc + item.value, 0);
-      const diff = totalNewValue - totalOriginalValue;
-      
-      updateRemoval(removal.code, {
-        customAdditionals: items, 
-        value: removal.value + diff,
-        history: [...removal.history, { 
-          date: new Date().toISOString(), 
-          action: `Financeiro Junior ${user.name.split(' ')[0]} ${historyActions.join(' e ')}.`, 
-          user: user.name 
-        }],
-      });
+        const diff = processedItems.reduce((acc, item) => acc + item.value, 0) - originalItems.reduce((acc, item) => acc + item.value, 0);
+        updateRemoval(removal.code, {
+            customAdditionals: processedItems, value: removal.value + diff,
+            history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${historyActions.join(' e ')}.`, user: user.name }],
+        });
     }
     resetAndCloseEdit();
   };
@@ -196,10 +201,9 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const handleSaveAdjustment = () => {
     if (!user || !adjustmentValue) return;
     const value = parseFloat(adjustmentValue);
-    const newValue = adjustmentType === 'receber' ? removal.value + value : removal.value - value;
     const actionText = adjustmentType === 'receber' ? `recebeu um valor de R$ ${value.toFixed(2)}` : `devolveu um valor de R$ ${value.toFixed(2)}`;
     updateRemoval(removal.code, {
-      value: newValue,
+      value: adjustmentType === 'receber' ? removal.value + value : removal.value - value,
       adjustmentConfirmed: true,
       history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionText}.`, user: user.name, proofUrl: adjustmentProof ? adjustmentProof.name : undefined }],
     });
@@ -208,10 +212,9 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
   const handleSaveModality = () => {
     if (!user || modalityDifference === 0) return;
-    const newValue = removal.value + modalityDifference;
     const actionText = `alterou a modalidade de ${removal.modality.replace(/_/g, ' ')} para ${newModality.replace(/_/g, ' ')}, com um ajuste de R$ ${modalityDifference.toFixed(2)}`;
     updateRemoval(removal.code, {
-      modality: newModality, value: newValue,
+      modality: newModality, value: removal.value + modalityDifference,
       history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionText}.`, user: user.name, proofUrl: modalityProof ? modalityProof.name : undefined }],
     });
     resetAndCloseEdit();
@@ -219,146 +222,105 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
   const handleSaveCremationData = () => {
     if (!user) return;
+    const companyChanged = cremationCompany !== (removal.cremationCompany || undefined);
     const dateChanged = cremationDate !== (removal.cremationDate || '');
     const obsChanged = certificateObs !== (removal.certificateObservations || '');
-
-    if (!dateChanged && !obsChanged) {
-      resetAndCloseEdit();
-      return;
-    }
-
+    if (!companyChanged && !dateChanged && !obsChanged) { resetAndCloseEdit(); return; }
     const actionParts: string[] = [];
-
+    if (companyChanged && cremationCompany) actionParts.push(`definiu a empresa de cremação para ${cremationCompany}`);
     if (dateChanged && cremationDate) {
         const [year, month, day] = cremationDate.split('-');
-        const formattedDate = `${day}/${month}/${year}`;
-        actionParts.push(`definiu a data de cremação para ${formattedDate}`);
+        actionParts.push(`definiu a data de cremação para ${day}/${month}/${year}`);
     }
-
-    if (obsChanged) {
-        if (certificateObs) {
-            actionParts.push(`adicionou a observação ao certificado: "${certificateObs}"`);
-        } else {
-            actionParts.push(`removeu as observações do certificado`);
-        }
-    }
-
-    const actionText = actionParts.join(' e ');
-
-    if (actionText) {
+    if (obsChanged) actionParts.push(certificateObs ? `adicionou a observação ao certificado: "${certificateObs}"` : `removeu as observações do certificado`);
+    if (actionParts.join(' e ')) {
         updateRemoval(removal.code, {
-            cremationDate,
-            certificateObservations: certificateObs,
-            history: [...removal.history, { 
-                date: new Date().toISOString(), 
-                action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionText}.`, 
-                user: user.name 
-            }],
+            cremationCompany, cremationDate, certificateObservations: certificateObs,
+            history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionParts.join(' e ')}.`, user: user.name }],
         });
     }
-
     resetAndCloseEdit();
   };
 
-  if (removal.status !== 'aguardando_financeiro_junior') return null;
-
-  if (isEditing) {
+  // Handle 'Finalizadas' tab (status: aguardando_baixa_master)
+  if (removal.status === 'aguardando_baixa_master') {
     return (
-      <div className="w-full h-full flex flex-col">
-        {/* TABS */}
-        <div className="flex-shrink-0 border-b">
-          <button onClick={() => setActiveEditTab('add')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'add' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Adicionar Produtos</button>
-          <button onClick={() => setActiveEditTab('adjust')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'adjust' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Abater Valores</button>
-          <button onClick={() => setActiveEditTab('change_modality')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'change_modality' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Alterar Modalidade</button>
-          <button onClick={() => setActiveEditTab('cremation')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'cremation' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Dados Cremação</button>
-        </div>
+        <>
+            <button
+                onClick={() => setIsCertificateModalOpen(true)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-2"
+            >
+                <Award size={16} /> Gerar Certificado
+            </button>
+            <CertificateModal
+                isOpen={isCertificateModalOpen}
+                onClose={() => setIsCertificateModalOpen(false)}
+                removal={removal}
+            />
+        </>
+    );
+  }
 
-        {/* SCROLLABLE CONTENT */}
-        <div className="flex-grow overflow-y-auto p-4">
-          {activeEditTab === 'add' && (
-            <div className="space-y-4">
-              <div className="space-y-3 p-3 bg-gray-50 rounded-md border">
-                <div className="flex gap-2 items-end">
-                  <div className="flex-grow"><label className="text-xs font-medium text-gray-600">Produto</label><input type="text" value={productName} onChange={e => setProductName(e.target.value)} placeholder="Nome do produto" className="w-full px-2 py-1 border rounded-md text-sm" /></div>
-                  <div className="w-24"><label className="text-xs font-medium text-gray-600">Valor (R$)</label><input type="number" value={productValue} onChange={e => setProductValue(e.target.value)} placeholder="Valor" className="w-full px-2 py-1 border rounded-md text-sm" /></div>
+  // Handle 'Pendentes' tabs (status: aguardando_financeiro_junior)
+  if (removal.status === 'aguardando_financeiro_junior') {
+    if (isEditing) {
+      return (
+        <div className="w-full h-full flex flex-col">
+          <div className="flex-shrink-0 border-b">
+            <button onClick={() => setActiveEditTab('add')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'add' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Adicionar Produtos</button>
+            <button onClick={() => setActiveEditTab('adjust')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'adjust' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Abater Valores</button>
+            <button onClick={() => setActiveEditTab('change_modality')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'change_modality' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Alterar Modalidade</button>
+            <button onClick={() => setActiveEditTab('cremation')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'cremation' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Dados Cremação</button>
+          </div>
+          <div className="flex-grow overflow-y-auto p-4">
+            {activeEditTab === 'add' && (isCollective ? (
+              <div className="space-y-4">
+                <div className="space-y-3 p-3 bg-gray-50 rounded-md border">
+                  {collectiveAdditionals.map(product => (<div key={product.id} className="flex justify-between items-center py-2 border-b last:border-b-0"><div><p className="font-medium">{product.name}</p><p className="text-sm text-green-600">R$ {product.value.toFixed(2)}</p></div><div className="flex items-center gap-3"><button type="button" onClick={() => handleCollectiveRemoveItem(product.name)} className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50" disabled={items.filter(i => i.name === product.name).length === 0}><Minus size={16} /></button><span className="font-bold text-lg w-8 text-center">{items.filter(i => i.name === product.name).length}</span><button type="button" onClick={() => handleCollectiveAddItem(product)} className="p-1 rounded-full bg-green-100 text-green-600 hover:bg-green-200"><Plus size={16} /></button></div></div>))}
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante (opcional)</label>
-                  <input id="custom-product-file-input" type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setSelectedFile(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                </div>
-                <button onClick={handleAddItem} disabled={items.length >= 10 || !productName || !productValue} className="w-full px-3 py-1.5 bg-blue-500 text-white rounded-md text-sm flex items-center justify-center gap-1 disabled:opacity-50"><Plus size={16} /> Adicionar Item</button>
+                <div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante</label><input id="collective-product-file-input" type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setSelectedFile(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div>
               </div>
-              {items.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Itens Adicionados:</p>
-                  <ul className="list-disc list-inside text-sm bg-gray-100 p-3 rounded-md border">
-                    {items.map(item => (<li key={item.id} className="flex justify-between items-center py-1"><span>{item.name} - R$ {item.value.toFixed(2)}</span><button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14} /></button></li>))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-          {activeEditTab === 'adjust' && (
-            <div className="space-y-4 p-1">
-              <div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="adjustmentType" value="receber" checked={adjustmentType === 'receber'} onChange={() => setAdjustmentType('receber')} />Receber</label><label className="flex items-center gap-2"><input type="radio" name="adjustmentType" value="devolver" checked={adjustmentType === 'devolver'} onChange={() => setAdjustmentType('devolver')} />Devolver</label></div>
-              <div><label className="text-xs font-medium text-gray-600">Valor (R$)</label><input type="number" value={adjustmentValue} onChange={e => setAdjustmentValue(e.target.value)} placeholder="Valor do ajuste" className="w-full px-2 py-1 border rounded-md text-sm" /></div>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante (opcional)</label><input type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setAdjustmentProof(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div>
-            </div>
-          )}
-          {activeEditTab === 'change_modality' && (
-            <div className="space-y-4 p-1">
-              <div>
-                <label className="text-xs font-medium text-gray-600">Nova Modalidade</label>
-                <select value={newModality} onChange={e => setNewModality(e.target.value as Removal['modality'])} className="w-full px-2 py-1 border rounded-md text-sm">
-                  <option value="coletivo">Coletivo</option>
-                  <option value="individual_prata">Individual Prata</option>
-                  <option value="individual_ouro">Individual Ouro</option>
-                </select>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-3 p-3 bg-gray-50 rounded-md border"><div className="flex gap-2 items-end"><div className="flex-grow"><label className="text-xs font-medium text-gray-600">Produto</label><input type="text" value={productName} onChange={e => setProductName(e.target.value)} placeholder="Nome do produto" className="w-full px-2 py-1 border rounded-md text-sm" /></div><div className="w-24"><label className="text-xs font-medium text-gray-600">Valor (R$)</label><input type="number" value={productValue} onChange={e => setProductValue(e.target.value)} placeholder="Valor" className="w-full px-2 py-1 border rounded-md text-sm" /></div></div><div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante</label><input id="custom-product-file-input" type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setSelectedFile(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div><button onClick={handleAddItem} disabled={items.length >= 10 || !productName || !productValue} className="w-full px-3 py-1.5 bg-blue-500 text-white rounded-md text-sm flex items-center justify-center gap-1 disabled:opacity-50"><Plus size={16} /> Adicionar Item</button></div>
+                {items.length > 0 && <div className="space-y-2"><p className="text-sm font-medium">Itens Adicionados:</p><ul className="list-disc list-inside text-sm bg-gray-100 p-3 rounded-md border">{items.map(item => (<li key={item.id} className="flex justify-between items-center py-1"><span>{item.name} - R$ {item.value.toFixed(2)}</span><button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14} /></button></li>))}</ul></div>}
               </div>
-              {modalityDifference !== 0 && (
-                <div className={`p-3 rounded-md text-sm ${modalityDifference > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                  {modalityDifference > 0 ? `Valor a cobrar: R$ ${modalityDifference.toFixed(2)}` : `Valor a devolver: R$ ${Math.abs(modalityDifference).toFixed(2)}`}
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante do Ajuste</label>
-                <input type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setModalityProof(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              </div>
-            </div>
-          )}
-          {activeEditTab === 'cremation' && (
-            <div className="space-y-4 p-1">
-              <div>
-                <label className="text-xs font-medium text-gray-600">Data da Cremação</label>
-                <input type="date" value={cremationDate} onChange={e => setCremationDate(e.target.value)} className="w-full px-2 py-1 border rounded-md text-sm" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600">Observações para o Certificado</label>
-                <textarea value={certificateObs} onChange={e => setCertificateObs(e.target.value)} placeholder="Ex: Adicionar nome do tutor no certificado" rows={3} className="w-full px-2 py-1 border rounded-md text-sm" />
-              </div>
-            </div>
-          )}
+            ))}
+            {activeEditTab === 'adjust' && <div className="space-y-4 p-1"><div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="adjustmentType" value="receber" checked={adjustmentType === 'receber'} onChange={() => setAdjustmentType('receber')} />Receber</label><label className="flex items-center gap-2"><input type="radio" name="adjustmentType" value="devolver" checked={adjustmentType === 'devolver'} onChange={() => setAdjustmentType('devolver')} />Devolver</label></div><div><label className="text-xs font-medium text-gray-600">Valor (R$)</label><input type="number" value={adjustmentValue} onChange={e => setAdjustmentValue(e.target.value)} placeholder="Valor do ajuste" className="w-full px-2 py-1 border rounded-md text-sm" /></div><div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante</label><input type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setAdjustmentProof(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div></div>}
+            {activeEditTab === 'change_modality' && <div className="space-y-4 p-1"><div><label className="text-xs font-medium text-gray-600">Nova Modalidade</label><select value={newModality} onChange={e => setNewModality(e.target.value as Removal['modality'])} className="w-full px-2 py-1 border rounded-md text-sm"><option value="coletivo">Coletivo</option><option value="individual_prata">Individual Prata</option><option value="individual_ouro">Individual Ouro</option></select></div>{modalityDifference !== 0 && <div className={`p-3 rounded-md text-sm ${modalityDifference > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>{modalityDifference > 0 ? `Valor a cobrar: R$ ${modalityDifference.toFixed(2)}` : `Valor a devolver: R$ ${Math.abs(modalityDifference).toFixed(2)}`}</div>}<div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante</label><input type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setModalityProof(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div></div>}
+            {activeEditTab === 'cremation' && <div className="space-y-4 p-1"><div><label className="text-xs font-medium text-gray-600 flex items-center mb-2"><Building className="h-4 w-4 mr-2"/>Empresa de Cremação</label><div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="cremationCompany" value="PETCÈU" checked={cremationCompany === 'PETCÈU'} onChange={() => setCremationCompany('PETCÈU')} />PETCÈU</label><label className="flex items-center gap-2"><input type="radio" name="cremationCompany" value="SQP" checked={cremationCompany === 'SQP'} onChange={() => setCremationCompany('SQP')} />SQP</label></div></div><div><label className="text-xs font-medium text-gray-600">Data da Cremação</label><input type="date" value={cremationDate} onChange={e => setCremationDate(e.target.value)} className="w-full px-2 py-1 border rounded-md text-sm" /></div><div><label className="text-xs font-medium text-gray-600">Observações para o Certificado</label><textarea value={certificateObs} onChange={e => setCertificateObs(e.target.value)} placeholder="Ex: Adicionar nome do tutor no certificado" rows={3} className="w-full px-2 py-1 border rounded-md text-sm" /></div></div>}
+          </div>
+          <div className="flex-shrink-0 p-3 border-t bg-gray-50 flex justify-end gap-2">
+            <button onClick={resetAndCloseEdit} className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md text-sm">Cancelar</button>
+            {activeEditTab === 'add' && <button onClick={handleSaveItems} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1"><Save size={14} /> Salvar Produtos</button>}
+            {activeEditTab === 'adjust' && <button onClick={handleSaveAdjustment} disabled={!adjustmentValue} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1 disabled:opacity-50"><Save size={14} /> Salvar Abatimento</button>}
+            {activeEditTab === 'change_modality' && <button onClick={handleSaveModality} disabled={modalityDifference === 0} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1 disabled:opacity-50"><Save size={14} /> Salvar Alteração</button>}
+            {activeEditTab === 'cremation' && <button onClick={handleSaveCremationData} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1"><Flame size={14} /> Salvar Dados</button>}
+          </div>
         </div>
-
-        {/* FIXED BUTTONS */}
-        <div className="flex-shrink-0 p-3 border-t bg-gray-50 flex justify-end gap-2">
-          <button onClick={resetAndCloseEdit} className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md text-sm">Cancelar</button>
-          
-          {activeEditTab === 'add' && <button onClick={handleSaveItems} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1"><Save size={14} /> Salvar Produtos</button>}
-          {activeEditTab === 'adjust' && <button onClick={handleSaveAdjustment} disabled={!adjustmentValue} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1 disabled:opacity-50"><Save size={14} /> Salvar Abatimento</button>}
-          {activeEditTab === 'change_modality' && <button onClick={handleSaveModality} disabled={modalityDifference === 0} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1 disabled:opacity-50"><Save size={14} /> Salvar Alteração</button>}
-          {activeEditTab === 'cremation' && <button onClick={handleSaveCremationData} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm flex items-center gap-1"><Flame size={14} /> Salvar Dados</button>}
-        </div>
+      );
+    }
+    if (isConfirmingFinalization) {
+      return (
+          <div className="w-full p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+              <h4 className="font-semibold text-yellow-900 mb-3 text-center">Tem certeza que deseja finalizar para Master?</h4>
+              <div className="flex gap-2">
+                  <button onClick={() => setIsConfirmingFinalization(false)} className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400">NÃO</button>
+                  <button onClick={handleConfirmFinalization} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">SIM</button>
+              </div>
+          </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-2">
+        <button onClick={() => { setActiveEditTab('add'); setIsEditing(true); }} className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 flex items-center gap-2"><Edit size={16} /> Adicionar/Editar</button>
+        {isCollective && <button onClick={handleReturnToOperational} className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 flex items-center gap-2"><Undo size={16} /> Retornar / Operacional</button>}
+        <button onClick={() => setIsConfirmingFinalization(true)} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"><CheckCircle size={16} /> Finalizar para Master</button>
       </div>
     );
   }
 
-  return (
-    <div className="flex items-center gap-2">
-      <button onClick={() => { setActiveEditTab('add'); setIsEditing(true); }} className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 flex items-center gap-2"><Edit size={16} /> Adicionar/Editar</button>
-      <button onClick={handleFinalizeForMaster} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"><CheckCircle size={16} /> Finalizar para Master</button>
-    </div>
-  );
+  return null;
 };
 
 export default FinanceiroJuniorActions;

@@ -41,7 +41,6 @@ const SolicitarRemocao: React.FC = () => {
   const [showPagamentoInfo, setShowPagamentoInfo] = useState(false);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
 
-  // Lista de pagamentos para Pessoa Física (sem 'Faturado')
   const paymentOptions = [
     { value: 'debito', label: 'Cartão de Débito' },
     { value: 'credito', label: 'Cartão de Crédito' },
@@ -56,7 +55,7 @@ const SolicitarRemocao: React.FC = () => {
       let valorBase = 0;
       if (formData.petPeso && formData.modalidade) {
         const pesoKey = formData.petPeso as keyof typeof priceTable;
-        if (priceTable[pesoKey] && priceTable[pesoKey][formData.modalidade]) {
+        if (priceTable[pesoKey]?.[formData.modalidade]) {
           valorBase = priceTable[pesoKey][formData.modalidade];
         }
       }
@@ -65,7 +64,14 @@ const SolicitarRemocao: React.FC = () => {
         return total + (adicional.value * adicional.quantity);
       }, 0);
   
-      setValorTotal(valorBase + valorAdicionais);
+      let finalTotal = valorBase + valorAdicionais;
+
+      if (formData.modalidade === 'individual_ouro' && adicionais.some(ad => ad.type === 'patinha_resina' && ad.quantity > 0)) {
+          const patinhaPrice = adicionaisDisponiveis.find(ad => ad.type === 'patinha_resina')?.value || 0;
+          finalTotal -= patinhaPrice;
+      }
+
+      setValorTotal(finalTotal);
     };
 
     calcularValorTotal();
@@ -372,31 +378,29 @@ const SolicitarRemocao: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Adicionais</h3>
               <div className="space-y-4">
                 {adicionaisDisponiveis.map((adicional) => (
-                  <div key={adicional.type} className={`flex items-center justify-between p-4 border rounded-lg ${isPatinhaInclusa && adicional.type === 'patinha_resina' ? 'bg-gray-100' : 'border-gray-200'}`}>
-                    <div className="flex-1">
+                  <div key={adicional.type} className={`flex items-center justify-between p-4 border rounded-lg ${isPatinhaInclusa && adicional.type === 'patinha_resina' ? 'bg-gray-50 border-green-200' : 'border-gray-200'}`}>
+                    <div>
                       <span className="font-medium">{adicional.label}</span>
                       <span className="text-green-600 ml-2">R$ {adicional.value},00</span>
                       {isPatinhaInclusa && adicional.type === 'patinha_resina' && (
-                        <span className="ml-3 text-xs font-bold text-white bg-green-500 px-2 py-0.5 rounded-full">Incluso</span>
+                        <span className="ml-3 text-xs font-bold text-white bg-green-500 px-2 py-0.5 rounded-full">1ª Grátis</span>
                       )}
                     </div>
                     <div className="flex items-center space-x-3">
                       <button
                         type="button"
                         onClick={() => handleAdicionalChange(adicional.type, Math.max(0, getAdicionalQuantity(adicional.type) - 1))}
-                        className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={isPatinhaInclusa && adicional.type === 'patinha_resina'}
+                        className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200"
                       >
                         <Minus className="h-4 w-4" />
                       </button>
                       <span className="w-8 text-center font-medium">
-                        {isPatinhaInclusa && adicional.type === 'patinha_resina' ? 1 : getAdicionalQuantity(adicional.type)}
+                        {getAdicionalQuantity(adicional.type)}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleAdicionalChange(adicional.type, Math.min(15, getAdicionalQuantity(adicional.type) + 1))}
-                        className="p-1 rounded-full bg-green-100 text-green-600 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={isPatinhaInclusa && adicional.type === 'patinha_resina'}
+                        className="p-1 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
                       >
                         <Plus className="h-4 w-4" />
                       </button>

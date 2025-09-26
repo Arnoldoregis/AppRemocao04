@@ -2,11 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
 import Layout from '../components/Layout';
-import { CalendarDays, Download, Search } from 'lucide-react';
+import { CalendarDays, Download, Search, Plus } from 'lucide-react';
 import { Removal, RemovalStatus } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
 import { exportToExcel } from '../utils/exportToExcel';
+import RequestTypeModal from '../components/modals/RequestTypeModal';
 
 const ReceptorHome: React.FC = () => {
   const { removals } = useRemovals();
@@ -14,6 +15,7 @@ const ReceptorHome: React.FC = () => {
   const [activeTab, setActiveTab] = useState<RemovalStatus>('solicitada');
   const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
 
   useEffect(() => {
     if (selectedRemoval) {
@@ -67,6 +69,13 @@ const ReceptorHome: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
             <button 
+                onClick={() => setIsRequestModalOpen(true)}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-green-700 transition-colors"
+            >
+                <Plus className="h-5 w-5 mr-2" />
+                Solicitar Remoção
+            </button>
+            <button 
                 onClick={() => navigate('/agenda-despedida')}
                 className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-purple-700 transition-colors"
             >
@@ -104,6 +113,10 @@ const ReceptorHome: React.FC = () => {
         </div>
       </div>
       <RemovalDetailsModal removal={selectedRemoval} onClose={() => setSelectedRemoval(null)} />
+      <RequestTypeModal 
+        isOpen={isRequestModalOpen} 
+        onClose={() => setIsRequestModalOpen(false)} 
+      />
     </Layout>
   );
 };

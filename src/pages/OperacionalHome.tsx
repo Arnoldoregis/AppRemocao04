@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
+import { useAgenda } from '../context/AgendaContext';
 import Layout from '../components/Layout';
-import { Search, Download, List, Check, Package, CalendarDays } from 'lucide-react';
+import { Search, Download, List, Package, CalendarDays, Flame, HeartHandshake, PackagePlus } from 'lucide-react';
 import { Removal } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
@@ -10,10 +11,11 @@ import { exportToExcel } from '../utils/exportToExcel';
 
 const OperacionalHome: React.FC = () => {
     const { removals } = useRemovals();
+    const { schedule } = useAgenda();
     const navigate = useNavigate();
     const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState<'pendentes' | 'coletivos' | 'finalizadas'>('pendentes');
+    const [activeTab, setActiveTab] = useState<'pendentes' | 'coletivos' | 'aguardando_liberacao' | 'com_despedida' | 'coletivo_adicional'>('pendentes');
 
     useEffect(() => {
         if (selectedRemoval) {
@@ -26,6 +28,8 @@ const OperacionalHome: React.FC = () => {
 
     const filteredRemovals = useMemo(() => {
         let baseRemovals: Removal[];
+        const scheduledCodes = Object.values(schedule).map(r => r.code);
+
         switch (activeTab) {
             case 'pendentes':
                 baseRemovals = removals.filter(r => r.status === 'concluida' && r.modality.includes('individual'));
@@ -33,8 +37,22 @@ const OperacionalHome: React.FC = () => {
             case 'coletivos':
                 baseRemovals = removals.filter(r => r.status === 'concluida' && r.modality === 'coletivo');
                 break;
-            case 'finalizadas':
-                baseRemovals = removals.filter(r => r.history.some(h => h.user.toLowerCase().includes('operacional')) && r.status !== 'concluida');
+            case 'aguardando_liberacao':
+                baseRemovals = removals.filter(r => 
+                    r.status === 'aguardando_baixa_master' && 
+                    r.modality.includes('individual') && 
+                    !scheduledCodes.includes(r.code)
+                );
+                break;
+            case 'com_despedida':
+                baseRemovals = removals.filter(r => r.status === 'aguardando_baixa_master' && scheduledCodes.includes(r.code));
+                break;
+            case 'coletivo_adicional':
+                baseRemovals = removals.filter(r => 
+                    r.status === 'aguardando_baixa_master' && 
+                    r.modality === 'coletivo' &&
+                    ((r.additionals && r.additionals.length > 0) || (r.customAdditionals && r.customAdditionals.length > 0))
+                );
                 break;
             default:
                 baseRemovals = [];
@@ -49,7 +67,7 @@ const OperacionalHome: React.FC = () => {
             );
         }
         return baseRemovals;
-    }, [removals, activeTab, searchTerm]);
+    }, [removals, activeTab, searchTerm, schedule]);
 
     const handleDownload = () => {
         exportToExcel(filteredRemovals, `historico_operacional_${activeTab}`);
@@ -58,7 +76,9 @@ const OperacionalHome: React.FC = () => {
     const tabs = [
         { id: 'pendentes' as const, label: 'Pendentes Individuais', icon: List },
         { id: 'coletivos' as const, label: 'Pendentes Coletivos', icon: Package },
-        { id: 'finalizadas' as const, label: 'Análises Finalizadas', icon: Check },
+        { id: 'aguardando_liberacao' as const, label: 'Aguardando Liberação', icon: Flame },
+        { id: 'com_despedida' as const, label: 'Com Despedida', icon: HeartHandshake },
+        { id: 'coletivo_adicional' as const, label: 'Coletivo/Adicional', icon: PackagePlus },
     ];
 
     return (
@@ -75,6 +95,13 @@ const OperacionalHome: React.FC = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 </div>
                 <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => navigate('/painel-cremador')}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-orange-700 transition-colors"
+                    >
+                        <Flame className="h-5 w-5 mr-2" />
+                        Painel do Cremador
+                    </button>
                     <button 
                         onClick={() => navigate('/agenda-despedida')}
                         className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-purple-700 transition-colors"

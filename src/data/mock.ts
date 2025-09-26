@@ -2,9 +2,9 @@ import { faker } from '@faker-js/faker';
 import { Removal, RemovalStatus } from '../types';
 
 export const mockDrivers = [
-  { id: 'motorista_1', name: 'Fernando', email: 'motorista@gmail.com' },
-  { id: 'motorista_2', name: 'Mariana Lima', email: 'motorista2@example.com' },
-  { id: 'motorista_3', name: 'Ricardo Andrade', email: 'motorista3@example.com' },
+  { id: 'motorista_1', name: 'Fernando', email: 'motorista@gmail.com', phone: '41984938295' },
+  { id: 'motorista_2', name: 'Mariana Lima', email: 'motorista2@example.com', phone: '41999998888' },
+  { id: 'motorista_3', name: 'Ricardo Andrade', email: 'motorista3@example.com', phone: '41977776666' },
 ];
 
 export const generateMockRemovals = (): Removal[] => {
@@ -15,8 +15,8 @@ export const generateMockRemovals = (): Removal[] => {
     ];
     const owners = ['clinic_456', 'pf_123'];
     const drivers = [
-        { id: 'motorista_1', name: 'Fernando' },
-        { id: 'motorista_2', name: 'Mariana Lima' },
+        { id: 'motorista_1', name: 'Fernando', phone: '41984938295' },
+        { id: 'motorista_2', name: 'Mariana Lima', phone: '41999998888' },
     ];
 
     // Gerar 2 remoções para o Financeiro Junior (Coletivo)
@@ -72,6 +72,77 @@ export const generateMockRemovals = (): Removal[] => {
         });
     }
 
+    // NOVOS DADOS PARA TESTE DO FINANCEIRO JUNIOR
+    const testRemovalsForFinJr: Removal[] = [
+        {
+            code: `TESTE_FINJR_COLETIVO_FATURADO`,
+            createdById: 'clinic_456',
+            clinicName: 'Clínica Vet+',
+            modality: 'coletivo',
+            tutor: { name: 'Ana Paula', cpfOrCnpj: faker.finance.accountNumber(11), phone: faker.phone.number(), email: faker.internet.email() },
+            pet: { name: 'Frajola', species: 'gato', breed: 'SRD', gender: 'macho', weight: '0-5kg', causeOfDeath: 'Atropelamento' },
+            removalAddress: { street: faker.location.streetAddress(), city: 'Curitiba', state: 'PR', cep: '81000-100', number: '250', neighborhood: 'Água Verde' },
+            additionals: [],
+            paymentMethod: 'faturado',
+            value: 207.00,
+            observations: 'Remoção faturada para clínica.',
+            requestType: 'agora',
+            status: 'aguardando_financeiro_junior',
+            history: [
+                { date: faker.date.recent({days: 1}).toISOString(), action: 'Encaminhado para Financeiro Junior', user: 'Operacional (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 2 }).toISOString(),
+            realWeight: 3.2,
+            contactedByFinance: true,
+        },
+        {
+            code: `TESTE_FINJR_INDIVIDUAL_SEM_CONTATO`,
+            createdById: 'pf_123',
+            modality: 'individual_prata',
+            tutor: { name: 'Carlos Eduardo', cpfOrCnpj: faker.finance.accountNumber(11), phone: faker.phone.number(), email: faker.internet.email() },
+            pet: { name: 'Rex', species: 'cachorro', breed: 'Pastor Alemão', gender: 'macho', weight: '21-40kg', causeOfDeath: 'Insuficiência renal' },
+            removalAddress: { street: faker.location.streetAddress(), city: 'Curitiba', state: 'PR', cep: '80000-000', number: '456', neighborhood: 'Batel' },
+            additionals: [],
+            paymentMethod: 'pix',
+            value: 850.00,
+            observations: 'Tutor muito abalado, aguardando contato.',
+            requestType: 'agora',
+            status: 'aguardando_financeiro_junior',
+            history: [
+                 { date: faker.date.recent({days: 1}).toISOString(), action: 'Encaminhado para Financeiro Junior', user: 'Operacional (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 1 }).toISOString(),
+            realWeight: 38,
+            petCondition: 'Corpo em bom estado.',
+            farewellSchedulingInfo: 'Tutor solicitou contato para agendar despedida.',
+            contactedByFinance: false,
+        },
+        {
+            code: `TESTE_FINJR_FINALIZADA`,
+            createdById: 'pf_123',
+            modality: 'individual_ouro',
+            tutor: { name: 'Mariana Costa', cpfOrCnpj: faker.finance.accountNumber(11), phone: faker.phone.number(), email: faker.internet.email() },
+            pet: { name: 'Luna', species: 'gato', breed: 'Siamês', gender: 'femea', weight: '0-5kg', causeOfDeath: 'Idade' },
+            removalAddress: { street: faker.location.streetAddress(), city: 'Curitiba', state: 'PR', cep: '80000-000', number: '789', neighborhood: 'Cabral' },
+            additionals: [],
+            paymentMethod: 'credito',
+            value: 500.00,
+            observations: 'Tudo ok.',
+            requestType: 'agora',
+            status: 'aguardando_baixa_master',
+            history: [
+                { date: faker.date.past().toISOString(), action: 'Solicitação criada', user: 'Mariana Costa' },
+                { date: faker.date.recent().toISOString(), action: `Financeiro Junior (Teste) finalizou e enviou para o Financeiro Master (PETCÈU)`, user: 'Financeiro Junior (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 5 }).toISOString(),
+            realWeight: 4.1,
+            contactedByFinance: true,
+            cremationCompany: 'PETCÈU',
+        }
+    ];
+    mockRemovals.push(...testRemovalsForFinJr);
+
+
     // Gerar 3 remoções faturadas para a mesma clínica
     for (let i = 0; i < 3; i++) {
         const faturadoRemoval: Removal = {
@@ -104,12 +175,13 @@ export const generateMockRemovals = (): Removal[] => {
                 { date: faker.date.past().toISOString(), action: 'Solicitação criada por Clínica Vet Top (Teste)', user: 'Clínica Vet Top (Teste)' },
                 { date: faker.date.recent().toISOString(), action: 'Receptor Taiane encaminhou para o motorista Fernando', user: 'Taiane (Receptor)' },
                 { date: faker.date.recent().toISOString(), action: 'Motorista Fernando finalizou a remoção', user: 'Fernando (Motorista)' },
-                { date: faker.date.recent().toISOString(), action: 'Financeiro Junior finalizou e enviou para o Financeiro Master', user: 'Financeiro Junior (Teste)' },
+                { date: faker.date.recent().toISOString(), action: 'Financeiro Junior finalizou e enviou para o Financeiro Master (SQP)', user: 'Financeiro Junior (Teste)' },
             ],
             createdAt: faker.date.recent({ days: 15 }).toISOString(),
             assignedDriver: drivers[0],
             realWeight: 4.5,
             contactedByFinance: true,
+            cremationCompany: 'SQP',
         };
         mockRemovals.push(faturadoRemoval);
     }
@@ -155,6 +227,32 @@ export const generateMockRemovals = (): Removal[] => {
         mockRemovals.push(coletivoPendente);
     }
 
+    // Gerar 5 remoções individuais finalizadas para o cremador
+    for (let i = 0; i < 5; i++) {
+        mockRemovals.push({
+            code: `CREM_${i+1}`,
+            createdById: 'pf_123',
+            modality: 'individual_prata',
+            tutor: { name: faker.person.fullName(), cpfOrCnpj: faker.finance.accountNumber(11), phone: faker.phone.number(), email: faker.internet.email() },
+            pet: { name: faker.animal.dog(), species: 'cachorro', breed: 'SRD', gender: 'macho', weight: '6-10kg', causeOfDeath: 'Natural' },
+            removalAddress: { street: faker.location.streetAddress(), city: 'Curitiba', state: 'PR', cep: '80000-000', number: '123', neighborhood: 'Centro' },
+            additionals: [],
+            paymentMethod: 'pix',
+            value: 780,
+            observations: 'Aguardando cremação.',
+            requestType: 'agora',
+            status: 'finalizada',
+            history: [
+                { date: faker.date.past().toISOString(), action: 'Solicitação criada', user: 'Tutor' },
+                { date: faker.date.recent().toISOString(), action: 'Liberado para cremação pelo Operacional', user: 'Operacional (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 4 }).toISOString(),
+            realWeight: 8.5,
+            contactedByFinance: true,
+            cremationCompany: 'PETCÈU',
+        });
+    }
+
     // Gerar outras remoções
     for (let i = 0; i < 50; i++) {
       const ownerId = owners[i % owners.length];
@@ -164,6 +262,7 @@ export const generateMockRemovals = (): Removal[] => {
       
       const history = [{ date: faker.date.past().toISOString(), action: `Solicitação criada por ${ownerId === 'clinic_456' ? 'Clínica Vet Top' : 'João da Silva'}`, user: ownerId === 'clinic_456' ? 'Clínica Vet Top' : 'João da Silva' }];
       let assignedDriver;
+      let cremationCompany;
 
       if (['em_andamento', 'a_caminho', 'removido', 'concluida', 'finalizada', 'aguardando_baixa_master'].includes(status)) {
         assignedDriver = drivers[i % drivers.length];
@@ -195,9 +294,10 @@ export const generateMockRemovals = (): Removal[] => {
         });
       }
       if (status === 'aguardando_baixa_master' && assignedDriver) {
+        cremationCompany = faker.helpers.arrayElement(['PETCÈU', 'SQP']);
         history.push({
             date: faker.date.recent().toISOString(),
-            action: `Financeiro Junior (Teste) finalizou e enviou para o Financeiro Master`,
+            action: `Financeiro Junior (Teste) finalizou e enviou para o Financeiro Master (${cremationCompany})`,
             user: `Financeiro Junior (Teste)`
         });
       }
@@ -242,6 +342,7 @@ export const generateMockRemovals = (): Removal[] => {
         assignedDriver: assignedDriver,
         realWeight: ['concluida', 'finalizada', 'aguardando_baixa_master'].includes(status) ? faker.number.int({ min: 5, max: 20}) : undefined,
         contactedByFinance: faker.datatype.boolean({ probability: 0.1 }),
+        cremationCompany: cremationCompany,
       };
       mockRemovals.push(removal);
     }

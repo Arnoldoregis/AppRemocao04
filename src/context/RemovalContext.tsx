@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Removal, RemovalStatus } from '../types';
+import { Removal, RemovalStatus, CremationBatch, CremationBatchItem } from '../types';
 import { generateMockRemovals } from '../data/mock';
 import { differenceInMinutes, parse, isBefore } from 'date-fns';
 import { useNotifications } from './NotificationContext';
@@ -12,6 +12,10 @@ interface RemovalContextType {
   getRemovalsByStatus: (status: RemovalStatus) => Removal[];
   getRemovalsByOwner: (ownerId: string) => Removal[];
   generateRemovalCode: () => string;
+  cremationBatches: CremationBatch[];
+  createCremationBatch: (items: CremationBatchItem[], operatorName: string) => void;
+  startCremationBatch: (batchId: string, operatorName: string) => void;
+  finishCremationBatch: (batchId: string, operatorName: string) => void;
 }
 
 const RemovalContext = createContext<RemovalContextType | undefined>(undefined);
@@ -31,6 +35,7 @@ interface RemovalProviderProps {
 export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) => {
   const [removals, setRemovals] = useState<Removal[]>([]);
   const [codeCounter, setCodeCounter] = useState(1);
+  const [cremationBatches, setCremationBatches] = useState<CremationBatch[]>([]);
   const { addNotification } = useNotifications();
   
   const generateRemovalCode = (): string => {
@@ -158,6 +163,83 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
     return removals.filter(removal => removal.createdById === ownerId);
   };
 
+  const createCremationBatch = (items: CremationBatchItem[], operatorName: string) => {
+    const newBatch: CremationBatch = {
+      id: `LOTE-${new Date().getTime()}`,
+      createdAt: new Date().toISOString(),
+      items: items,
+    };
+    setCremationBatches(prev => [newBatch, ...prev]);
+
+    const removalCodes = items.map(item => item.removalCode);
+    const historyEntry = {
+        date: new Date().toISOString(),
+        action: `Adicionado ao lote de cremação ${newBatch.id} pelo operador ${operatorName.split(' ')[0]}`,
+        user: operatorName,
+    };
+
+    setRemovals(prevRemovals => 
+      prevRemovals.map(r => 
+        removalCodes.includes(r.code) ? { ...r, status: 'em_lote_cremacao', history: [...r.history, historyEntry] } : r
+      )
+    );
+    addNotification(`Novo lote de cremação ${newBatch.id} foi criado.`, { recipientRole: 'operacional' });
+  };
+
+  const startCremationBatch = (batchId: string, operatorName: string) => {
+    let removalCodesToUpdate: string[] = [];
+    setCremationBatches(prev => 
+      prev.map(batch => {
+        if (batch.id === batchId) {
+            removalCodesToUpdate = batch.items.map(item => item.removalCode);
+            return { ...batch, startedAt: new Date().toISOString() };
+        }
+        return batch;
+      })
+    );
+
+    if (removalCodesToUpdate.length > 0) {
+        const historyEntry = {
+            date: new Date().toISOString(),
+            action: `Cremação do lote ${batchId} iniciada pelo operador ${operatorName.split(' ')[0]}`,
+            user: operatorName,
+        };
+        setRemovals(prevRemovals =>
+            prevRemovals.map(r =>
+                removalCodesToUpdate.includes(r.code) ? { ...r, history: [...r.history, historyEntry] } : r
+            )
+        );
+    }
+  };
+
+  const finishCremationBatch = (batchId: string, operatorName: string) => {
+    let removalCodesToUpdate: string[] = [];
+
+    setCremationBatches(prevBatches => 
+      prevBatches.map(batch => {
+        if (batch.id === batchId) {
+          removalCodesToUpdate = batch.items.map(item => item.removalCode);
+          return { ...batch, finishedAt: new Date().toISOString() };
+        }
+        return batch;
+      })
+    );
+
+    if (removalCodesToUpdate.length > 0) {
+        const historyEntry = {
+            date: new Date().toISOString(),
+            action: `Pet cremado no lote ${batchId} pelo operador ${operatorName.split(' ')[0]}`,
+            user: operatorName,
+        };
+        setRemovals(prevRemovals => 
+          prevRemovals.map(r => 
+            removalCodesToUpdate.includes(r.code) ? { ...r, status: 'cremado', history: [...r.history, historyEntry] } : r
+          )
+        );
+    }
+    addNotification(`O lote de cremação ${batchId} foi finalizado.`, { recipientRole: 'operacional' });
+  };
+
   const value = {
     removals,
     addRemoval,
@@ -166,6 +248,10 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
     getRemovalsByStatus,
     getRemovalsByOwner,
     generateRemovalCode,
+    cremationBatches,
+    createCremationBatch,
+    startCremationBatch,
+    finishCremationBatch,
   };
 
   return <RemovalContext.Provider value={value}>{children}</RemovalContext.Provider>;
