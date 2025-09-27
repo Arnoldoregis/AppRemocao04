@@ -7,11 +7,14 @@ import { Removal, RemovalStatus } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
 import { exportToExcel } from '../utils/exportToExcel';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import MonthlyBatchCard from '../components/cards/MonthlyBatchCard';
 
 const MotoristaHome: React.FC = () => {
   const { user } = useAuth();
   const { removals } = useRemovals();
-  const [activeTab, setActiveTab] = useState<RemovalStatus>('em_andamento');
+  const [activeTab, setActiveTab] = useState<RemovalStatus | 'concluidas'>('em_andamento');
   const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -30,6 +33,8 @@ const MotoristaHome: React.FC = () => {
   }, [removals, user]);
 
   const filteredRemovals = useMemo(() => {
+    if (activeTab === 'concluidas') return []; // Handled by concluidasGroupedByMonth
+
     let tabFiltered = driverRemovals.filter(r => r.status === activeTab);
     
     if (searchTerm) {
@@ -45,15 +50,61 @@ const MotoristaHome: React.FC = () => {
     return tabFiltered;
   }, [activeTab, driverRemovals, searchTerm]);
 
+  const concluidasGroupedByMonth = useMemo(() => {
+    if (activeTab !== 'concluidas') return null;
+
+    const completedStatuses: RemovalStatus[] = [
+        'aguardando_financeiro_junior', 
+        'aguardando_baixa_master', 
+        'finalizada', 
+        'cremado', 
+        'pronto_para_entrega',
+        'concluida'
+    ];
+
+    let completedRemovals = driverRemovals.filter(r => completedStatuses.includes(r.status));
+    
+    if (searchTerm) {
+        const lowerCaseSearch = searchTerm.toLowerCase();
+        completedRemovals = completedRemovals.filter(r => 
+            r.tutor.name.toLowerCase().includes(lowerCaseSearch) ||
+            r.pet.name.toLowerCase().includes(lowerCaseSearch) ||
+            r.code.toLowerCase().includes(lowerCaseSearch)
+        );
+    }
+
+    const grouped = completedRemovals.reduce((acc, removal) => {
+        const monthYear = format(new Date(removal.createdAt), 'MMMM yyyy', { locale: ptBR });
+        const capitalizedMonthYear = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+        if (!acc[capitalizedMonthYear]) {
+            acc[capitalizedMonthYear] = [];
+        }
+        acc[capitalizedMonthYear].push(removal);
+        return acc;
+    }, {} as { [key: string]: Removal[] });
+
+    return Object.entries(grouped).sort(([monthA], [monthB]) => {
+        const dateA = new Date(grouped[monthA][0].createdAt);
+        const dateB = new Date(grouped[monthB][0].createdAt);
+        return dateB.getTime() - dateA.getTime();
+    });
+  }, [activeTab, driverRemovals, searchTerm]);
+
+
   const handleDownload = () => {
-    exportToExcel(filteredRemovals, `historico_motorista_${activeTab}`);
+    if (activeTab === 'concluidas' && concluidasGroupedByMonth) {
+      const removalsToExport = concluidasGroupedByMonth.flatMap(([, monthRemovals]) => monthRemovals);
+      exportToExcel(removalsToExport, `historico_motorista_concluidas`);
+    } else {
+      exportToExcel(filteredRemovals, `historico_motorista_${activeTab}`);
+    }
   };
 
-  const tabs: { id: RemovalStatus; label: string }[] = [
+  const tabs: { id: RemovalStatus | 'concluidas'; label: string }[] = [
     { id: 'em_andamento', label: 'Solicitações Recebidas' },
     { id: 'a_caminho', label: 'A Caminho' },
     { id: 'removido', label: 'Removidas' },
-    { id: 'concluida', label: 'Concluídas' },
+    { id: 'concluidas', label: 'Concluídas' },
   ];
 
   return (
@@ -89,12 +140,28 @@ const MotoristaHome: React.FC = () => {
           </nav>
         </div>
         <div className="p-6">
-          {filteredRemovals.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />)}
-            </div>
-          ) : (
-            <p className="text-center text-gray-500 py-12">Nenhuma solicitação nesta categoria.</p>
+          {activeTab !== 'concluidas' && (
+            filteredRemovals.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />)}
+              </div>
+            ) : (
+              <p className="text-center text-gray-500 py-12">Nenhuma solicitação nesta categoria.</p>
+            )
+          )}
+          {activeTab === 'concluidas' && (
+            concluidasGroupedByMonth && concluidasGroupedByMonth.length > 0 ? (
+              <div className="space-y-6">
+                {concluidasGroupedByMonth.map(([month, monthRemovals]) => (
+                    <MonthlyBatchCard 
+                        key={month} 
+                        month={month} 
+                        removals={monthRemovals} 
+                        onSelectRemoval={setSelectedRemoval}
+                    />
+                ))}
+              </div>
+            ) : <p className="text-center text-gray-500 py-12">Nenhuma remoção concluída encontrada.</p>
           )}
         </div>
       </div>

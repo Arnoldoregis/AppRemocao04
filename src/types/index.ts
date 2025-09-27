@@ -43,7 +43,8 @@ export type RemovalStatus =
   | 'cancelada'           // Cancelado em alguma etapa
   | 'finalizada'          // Ciclo encerrado pelo Financeiro / Liberado para cremação pelo Operacional
   | 'em_lote_cremacao'    // Adicionado a um lote de cremação, aguardando início
-  | 'cremado'             // Cremador marcou como cremado
+  | 'cremado'             // Cremador marcou como cremado -> Vai para Montar Sacola
+  | 'pronto_para_entrega' // Sacola montada -> Vai para Fin. Jr. notificar
   | 'aguardando_boleto'   // Status para a visão da clínica
   | 'coletivo_pago'
   | 'individual_pago'
@@ -85,6 +86,14 @@ export interface Removal {
     name: string;
     phone?: string;
   };
+  assignedFinanceiroJunior?: {
+    id: string;
+    name: string;
+  };
+  assignedFinanceiroMaster?: {
+    id: string;
+    name: string;
+  };
   boletoUrl?: string;
   comprovanteFaturaUrl?: string;
   adjustmentConfirmed?: boolean;
@@ -94,6 +103,20 @@ export interface Removal {
   cremationCompany?: 'PETCÈU' | 'SQP';
   certificateObservations?: string;
   contactedByFinance?: boolean;
+  bagAssemblyDetails?: {
+    standardUrn: {
+      included: boolean;
+      productId?: string;
+      productName?: string;
+      quantity?: number;
+    };
+    pawPrint: {
+      included: boolean;
+      productId?: string;
+      productName?: string;
+      quantity?: number;
+    };
+  };
 }
 
 export interface Additional {
@@ -168,4 +191,18 @@ export interface CremationBatch {
   startedAt?: string;
   finishedAt?: string;
   items: CremationBatchItem[];
+}
+
+export type StockCategory = 'material_venda' | 'material_escritorio' | 'material_limpeza' | 'sob_encomenda';
+
+export interface StockItem {
+  id: string;
+  trackingCode: string;
+  name: string;
+  category: StockCategory;
+  quantity: number;
+  unitDescription?: string; // Ex: "Caixa c/ 100", "Pacote"
+  sellingPrice: number;
+  createdAt: string;
+  minAlertQuantity?: number;
 }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { Removal, RemovalStatus, CremationBatch, CremationBatchItem } from '../types';
 import { generateMockRemovals } from '../data/mock';
 import { differenceInMinutes, parse, isBefore } from 'date-fns';
@@ -34,33 +34,50 @@ interface RemovalProviderProps {
 
 export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) => {
   const [removals, setRemovals] = useState<Removal[]>([]);
-  const [codeCounter, setCodeCounter] = useState(1);
   const [cremationBatches, setCremationBatches] = useState<CremationBatch[]>([]);
   const { addNotification } = useNotifications();
+  const lastCodeNumberRef = useRef(0);
   
+  useEffect(() => {
+    const mockData = generateMockRemovals();
+    setRemovals(mockData);
+
+    // Encontra o maior número nos códigos existentes para evitar colisões
+    const maxNum = mockData.reduce((max, r) => {
+      const match = r.code.match(/\d+$/); // Pega a parte numérica no final do código
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > max) {
+          return num;
+        }
+      }
+      return max;
+    }, 0);
+    
+    lastCodeNumberRef.current = maxNum;
+  }, []);
+
   const generateRemovalCode = (): string => {
+    lastCodeNumberRef.current += 1;
+    const newNumber = lastCodeNumberRef.current;
+    
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const currentCount = codeCounter + removals.length; // Garante unicidade
-    const letterIndex = Math.floor((currentCount - 1) / 999999);
-    const number = ((currentCount - 1) % 999999) + 1;
+    // O prefixo muda a cada 1.000.000 de remoções
+    const letterIndex = Math.floor((newNumber - 1) / 999999);
+    const numberPart = ((newNumber - 1) % 999999) + 1;
     
     let prefix = '';
     if (letterIndex < 26) {
         prefix = letters[letterIndex];
     } else {
-        const firstLetter = Math.floor((letterIndex / 26) - 1);
-        const secondLetter = letterIndex % 26;
-        prefix = letters[firstLetter] + letters[secondLetter];
+        // Lógica para prefixos com duas letras (ex: AA, AB...), suportando milhões de combinações
+        const firstLetter = letters[Math.floor(letterIndex / 26) - 1];
+        const secondLetter = letters[letterIndex % 26];
+        prefix = `${firstLetter}${secondLetter}`;
     }
     
-    const code = `${prefix}${number.toString().padStart(6, '0')}`;
-    setCodeCounter(prev => prev + 1);
-    return code;
+    return `${prefix}${numberPart.toString().padStart(6, '0')}`;
   };
-
-  useEffect(() => {
-    setRemovals(generateMockRemovals());
-  }, []);
 
   // Efeito para verificar agendamentos
   useEffect(() => {

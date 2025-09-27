@@ -41,7 +41,7 @@ const MotoristaActions: React.FC<MotoristaActionsProps> = ({ removal, onClose })
         ...removal.history,
         {
           date: new Date().toISOString(),
-          action: `Motorista ${user.name.split(' ')[0]} pesou o pet (${realWeight} kg) e finalizou a remoção`,
+          action: `Motorista ${user.name.split(' ')[0]} pesou o pet (${realWeight} kg) e encaminhou para análise operacional`,
           user: user.name,
         },
       ],

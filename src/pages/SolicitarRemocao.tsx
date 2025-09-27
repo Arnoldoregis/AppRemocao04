@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useRemovals } from '../context/RemovalContext';
+import { usePricing } from '../context/PricingContext';
 import Layout from '../components/Layout';
 import { ArrowLeft, Upload, Plus, Minus, MapPin } from 'lucide-react';
 import { Additional, Removal } from '../types';
-import { priceTable, adicionaisDisponiveis } from '../data/pricing';
+import { adicionaisDisponiveis } from '../data/pricing';
 
 const SolicitarRemocao: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { generateRemovalCode, addRemoval } = useRemovals();
+  const { priceTable, modalities } = usePricing();
+  
+  const activeModalities = modalities.filter(m => m.active);
 
   const [formData, setFormData] = useState({
     modalidade: '' as Removal['modality'],
@@ -55,8 +59,9 @@ const SolicitarRemocao: React.FC = () => {
       let valorBase = 0;
       if (formData.petPeso && formData.modalidade) {
         const pesoKey = formData.petPeso as keyof typeof priceTable;
-        if (priceTable[pesoKey]?.[formData.modalidade]) {
-          valorBase = priceTable[pesoKey][formData.modalidade];
+        const modKey = formData.modalidade;
+        if (priceTable[pesoKey]?.[modKey]) {
+          valorBase = priceTable[pesoKey][modKey];
         }
       }
   
@@ -75,7 +80,7 @@ const SolicitarRemocao: React.FC = () => {
     };
 
     calcularValorTotal();
-  }, [formData.petPeso, formData.modalidade, adicionais]);
+  }, [formData.petPeso, formData.modalidade, adicionais, priceTable]);
 
   useEffect(() => {
     const needsUpload = formData.formaPagamento === 'pix' || formData.formaPagamento === 'link_pagamento';
@@ -188,24 +193,24 @@ const SolicitarRemocao: React.FC = () => {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Modalidade *</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {['coletivo', 'individual_prata', 'individual_ouro'].map((modalidade) => (
-                  <label key={modalidade} className="relative cursor-pointer">
+                {activeModalities.map((modalidade) => (
+                  <label key={modalidade.key} className="relative cursor-pointer">
                     <input
                       type="radio"
                       name="modalidade"
-                      value={modalidade}
-                      checked={formData.modalidade === modalidade}
+                      value={modalidade.key}
+                      checked={formData.modalidade === modalidade.key}
                       onChange={handleInputChange}
                       className="sr-only"
                       required
                     />
                     <div className={`p-4 rounded-lg border-2 text-center transition-all ${
-                      formData.modalidade === modalidade
+                      formData.modalidade === modalidade.key
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}>
                       <span className="font-medium">
-                        {modalidade.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        {modalidade.label}
                       </span>
                     </div>
                   </label>

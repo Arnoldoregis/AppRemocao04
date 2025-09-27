@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Removal } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useRemovals } from '../context/RemovalContext';
+import { usePricing } from '../context/PricingContext';
 import ReceptorActions from './actions/ReceptorActions';
 import MotoristaActions from './actions/MotoristaActions';
 import FinanceiroJuniorActions from './actions/FinanceiroJuniorActions';
@@ -11,7 +12,6 @@ import OperacionalActions from './actions/OperacionalActions';
 import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4, Flame, Building } from 'lucide-react';
 import { format } from 'date-fns';
 import { downloadFile } from '../utils/downloadFile';
-import { priceTable } from '../data/pricing';
 
 interface RemovalDetailsModalProps {
   removal: Removal | null;
@@ -35,6 +35,7 @@ const DetailItem: React.FC<{ label: string; value?: string | number | null }> = 
 const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onClose }) => {
   const { user } = useAuth();
   const { updateRemoval } = useRemovals();
+  const { priceTable } = usePricing();
   const [isEditing, setIsEditing] = useState(false);
   const [activeEditTab, setActiveEditTab] = useState<'add' | 'adjust' | 'change_modality' | 'cremation'>('add');
 
@@ -90,7 +91,7 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
     }
 
     return null;
-  }, [user, removal]);
+  }, [user, removal, priceTable]);
 
 
   if (!removal) return null;

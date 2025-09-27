@@ -13,6 +13,7 @@ const IncluirRemocaoModal: React.FC<IncluirRemocaoModalProps> = ({ slotKey, onCl
   const { removals } = useRemovals();
   const { scheduleFarewell, schedule } = useAgenda();
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirmingRemoval, setConfirmingRemoval] = useState<Removal | null>(null);
 
   const availableRemovals = useMemo(() => {
     const scheduledCodes = Object.values(schedule).map(r => r.code);
@@ -28,10 +29,33 @@ const IncluirRemocaoModal: React.FC<IncluirRemocaoModalProps> = ({ slotKey, onCl
     );
   }, [removals, schedule, searchTerm]);
 
-  const handleSelectRemoval = (removal: Removal) => {
-    scheduleFarewell(slotKey, removal);
-    onClose();
+  const handleSelectClick = (removal: Removal) => {
+    setConfirmingRemoval(removal);
   };
+
+  const handleConfirmSchedule = () => {
+    if (confirmingRemoval) {
+      scheduleFarewell(slotKey, confirmingRemoval);
+      onClose();
+    }
+  };
+
+  if (confirmingRemoval) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirmar Agendamento</h3>
+          <p className="text-gray-700 mb-6">
+            Tem certeza que deseja agendar a despedida para o pet <strong>{confirmingRemoval.pet.name}</strong> (código: {confirmingRemoval.code})?
+          </p>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setConfirmingRemoval(null)} className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400">NÃO</button>
+            <button onClick={handleConfirmSchedule} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">SIM</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -62,7 +86,7 @@ const IncluirRemocaoModal: React.FC<IncluirRemocaoModalProps> = ({ slotKey, onCl
                     <p className="text-sm text-gray-500">Código: {removal.code} | Modalidade: {removal.modality.replace(/_/g, ' ')}</p>
                   </div>
                   <button
-                    onClick={() => handleSelectRemoval(removal)}
+                    onClick={() => handleSelectClick(removal)}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700"
                   >
                     Agendar

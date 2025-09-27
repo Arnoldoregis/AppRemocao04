@@ -3,14 +3,19 @@ import { useRemovals } from '../context/RemovalContext';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import { Download, Search } from 'lucide-react';
-import { Removal, RemovalStatus, LoteFaturamento } from '../types';
+import { Removal, LoteFaturamento } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
 import FaturamentoCard from '../components/cards/FaturamentoCard';
 import FaturamentoModal from '../components/modals/FaturamentoModal';
 import { exportToExcel } from '../utils/exportToExcel';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import MonthlyBatchCard from '../components/cards/MonthlyBatchCard';
+import StockManagement from '../components/master/StockManagement';
+import PricingManagement from '../components/master/PricingManagement';
 
-type MasterTab = 'dar_baixa' | 'faturado_mensal' | 'pagamento_concluido' | 'finalizada';
+type MasterTab = 'dar_baixa' | 'faturado_mensal' | 'pagamento_concluido' | 'finalizada' | 'estoque' | 'planos';
 
 const FinanceiroMasterHome: React.FC = () => {
   const { removals } = useRemovals();
@@ -28,9 +33,12 @@ const FinanceiroMasterHome: React.FC = () => {
   }, [removals, selectedRemoval?.code]);
 
   const faturamentoLotes = useMemo(() => {
+    if (!user) return [];
     const lotes: { [key: string]: LoteFaturamento } = {};
     const removalsToGroup = removals.filter(r => 
-      r.paymentMethod === 'faturado' && r.status === 'aguardando_baixa_master'
+      r.paymentMethod === 'faturado' && 
+      r.status === 'aguardando_baixa_master' &&
+      r.assignedFinanceiroMaster?.id === user.id
     );
 
     removalsToGroup.forEach(r => {
@@ -50,11 +58,15 @@ const FinanceiroMasterHome: React.FC = () => {
       }
     });
     return Object.values(lotes);
-  }, [removals]);
+  }, [removals, user]);
 
   const pagamentosConcluidosLotes = useMemo(() => {
+    if (!user) return [];
     const lotes: { [key: string]: LoteFaturamento } = {};
-    const removalsToGroup = removals.filter(r => r.status === 'pagamento_concluido');
+    const removalsToGroup = removals.filter(r => 
+      r.status === 'pagamento_concluido' &&
+      r.assignedFinanceiroMaster?.id === user.id
+    );
     
     removalsToGroup.forEach(r => {
         if (r.clinicName) {
@@ -73,16 +85,24 @@ const FinanceiroMasterHome: React.FC = () => {
         }
     });
     return Object.values(lotes);
-  }, [removals]);
+  }, [removals, user]);
 
   const filteredRemovals = useMemo(() => {
+    if (!user) return [];
     let baseRemovals: Removal[] = [];
     switch(activeTab) {
       case 'dar_baixa':
-        baseRemovals = removals.filter(r => r.status === 'aguardando_baixa_master' && r.paymentMethod !== 'faturado');
+        baseRemovals = removals.filter(r => 
+          r.status === 'aguardando_baixa_master' && 
+          r.paymentMethod !== 'faturado' &&
+          r.assignedFinanceiroMaster?.id === user.id
+        );
         break;
       case 'finalizada':
-        baseRemovals = removals.filter(r => r.status === 'finalizada');
+        baseRemovals = removals.filter(r => 
+          r.status === 'finalizada' &&
+          r.assignedFinanceiroMaster?.id === user.id
+        );
         break;
       default:
         baseRemovals = [];
@@ -98,7 +118,27 @@ const FinanceiroMasterHome: React.FC = () => {
     }
     return baseRemovals;
 
-  }, [activeTab, removals, searchTerm]);
+  }, [activeTab, removals, searchTerm, user]);
+  
+  const finalizadasGroupedByMonth = useMemo(() => {
+    if (activeTab !== 'finalizada') return null;
+
+    const grouped = filteredRemovals.reduce((acc, removal) => {
+        const monthYear = format(new Date(removal.createdAt), 'MMMM yyyy', { locale: ptBR });
+        const capitalizedMonthYear = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+        if (!acc[capitalizedMonthYear]) {
+            acc[capitalizedMonthYear] = [];
+        }
+        acc[capitalizedMonthYear].push(removal);
+        return acc;
+    }, {} as { [key: string]: Removal[] });
+
+    return Object.entries(grouped).sort(([monthA], [monthB]) => {
+        const dateA = new Date(grouped[monthA][0].createdAt);
+        const dateB = new Date(grouped[monthB][0].createdAt);
+        return dateB.getTime() - dateA.getTime();
+    });
+  }, [activeTab, filteredRemovals]);
 
   const handleDownload = () => {
     if (activeTab === 'faturado_mensal') {
@@ -117,6 +157,8 @@ const FinanceiroMasterHome: React.FC = () => {
     { id: 'faturado_mensal', label: 'Faturado Mensal' },
     { id: 'pagamento_concluido', label: 'Pagamento Faturado Concluído' },
     { id: 'finalizada', label: 'Remoções Finalizadas' },
+    { id: 'estoque', label: 'Estoque' },
+    { id: 'planos', label: 'Planos' },
   ];
 
   return (
@@ -166,12 +208,35 @@ const FinanceiroMasterHome: React.FC = () => {
             ) : <p className="text-center text-gray-500 py-12">Nenhum pagamento de faturamento para confirmar.</p>
           )}
 
-          {(activeTab === 'dar_baixa' || activeTab === 'finalizada') && (
+          {activeTab === 'dar_baixa' && (
             filteredRemovals.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />)}
               </div>
             ) : <p className="text-center text-gray-500 py-12">Nenhuma remoção nesta categoria.</p>
+          )}
+          
+          {activeTab === 'finalizada' && (
+            finalizadasGroupedByMonth && finalizadasGroupedByMonth.length > 0 ? (
+              <div className="space-y-6">
+                {finalizadasGroupedByMonth.map(([month, monthRemovals]) => (
+                    <MonthlyBatchCard 
+                        key={month} 
+                        month={month} 
+                        removals={monthRemovals} 
+                        onSelectRemoval={setSelectedRemoval}
+                    />
+                ))}
+              </div>
+            ) : <p className="text-center text-gray-500 py-12">Nenhuma remoção nesta categoria.</p>
+          )}
+
+          {activeTab === 'estoque' && (
+            <StockManagement />
+          )}
+
+          {activeTab === 'planos' && (
+            <PricingManagement />
           )}
         </div>
       </div>

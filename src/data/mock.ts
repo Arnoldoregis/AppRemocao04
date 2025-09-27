@@ -42,6 +42,7 @@ export const generateMockRemovals = (): Removal[] => {
             createdAt: faker.date.recent({ days: 2 }).toISOString(),
             realWeight: 4.8,
             contactedByFinance: false,
+            assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
         });
     }
 
@@ -69,6 +70,7 @@ export const generateMockRemovals = (): Removal[] => {
             petCondition: 'Corpo em bom estado, mantido refrigerado.',
             farewellSchedulingInfo: 'Tutor prefere horários na parte da tarde.',
             contactedByFinance: false,
+            assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
         });
     }
 
@@ -94,6 +96,7 @@ export const generateMockRemovals = (): Removal[] => {
             createdAt: faker.date.recent({ days: 2 }).toISOString(),
             realWeight: 3.2,
             contactedByFinance: true,
+            assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
         },
         {
             code: `TESTE_FINJR_INDIVIDUAL_SEM_CONTATO`,
@@ -116,6 +119,7 @@ export const generateMockRemovals = (): Removal[] => {
             petCondition: 'Corpo em bom estado.',
             farewellSchedulingInfo: 'Tutor solicitou contato para agendar despedida.',
             contactedByFinance: false,
+            assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
         },
         {
             code: `TESTE_FINJR_FINALIZADA`,
@@ -138,6 +142,7 @@ export const generateMockRemovals = (): Removal[] => {
             realWeight: 4.1,
             contactedByFinance: true,
             cremationCompany: 'PETCÈU',
+            assignedFinanceiroMaster: { id: 'func_financeiro_master_1', name: 'Financeiro Master 1 (Teste)' },
         }
     ];
     mockRemovals.push(...testRemovalsForFinJr);
@@ -182,6 +187,7 @@ export const generateMockRemovals = (): Removal[] => {
             realWeight: 4.5,
             contactedByFinance: true,
             cremationCompany: 'SQP',
+            assignedFinanceiroMaster: { id: 'func_financeiro_master_1', name: 'Financeiro Master 1 (Teste)' },
         };
         mockRemovals.push(faturadoRemoval);
     }
@@ -226,6 +232,124 @@ export const generateMockRemovals = (): Removal[] => {
         };
         mockRemovals.push(coletivoPendente);
     }
+
+    // Gerar 2 remoções individuais cremadas para "Montar Sacola"
+    for (let i = 0; i < 2; i++) {
+        mockRemovals.push({
+            code: `CREMADO_IND_${i+1}`,
+            createdById: 'pf_123',
+            modality: 'individual_prata',
+            tutor: { name: faker.person.fullName(), cpfOrCnpj: faker.finance.accountNumber(11), phone: faker.phone.number(), email: faker.internet.email() },
+            pet: { name: faker.animal.dog(), species: 'cachorro', breed: 'Poodle', gender: 'femea', weight: '6-10kg', causeOfDeath: 'Idade' },
+            removalAddress: { street: faker.location.streetAddress(), city: 'Curitiba', state: 'PR', cep: '80000-000', number: '321', neighborhood: 'Centro' },
+            additionals: [],
+            paymentMethod: 'credito',
+            value: 780,
+            observations: 'Aguardando montagem da sacola.',
+            requestType: 'agora',
+            status: 'cremado',
+            history: [
+                { date: faker.date.past().toISOString(), action: 'Solicitação criada', user: 'Tutor' },
+                { date: faker.date.recent().toISOString(), action: 'Pet cremado no lote LOTE-12345', user: 'Operacional (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 4 }).toISOString(),
+            realWeight: 9.1,
+            contactedByFinance: true,
+            cremationCompany: 'PETCÈU',
+        });
+    }
+
+    const prontoParaEntregaRemovals: Removal[] = [
+        {
+            code: `PRONTO_1`,
+            createdById: 'pf_123',
+            modality: 'individual_ouro',
+            tutor: { name: 'Camila Santos', cpfOrCnpj: '111.222.333-44', phone: '41912345678', email: 'camila@example.com' },
+            pet: { name: 'Thor', species: 'cachorro', breed: 'Husky Siberiano', gender: 'macho', weight: '21-40kg', causeOfDeath: 'Idade avançada' },
+            removalAddress: { street: 'Rua das Flores', city: 'Curitiba', state: 'PR', cep: '80020-000', number: '100', neighborhood: 'Centro' },
+            additionals: [],
+            paymentMethod: 'credito',
+            value: 999.00,
+            observations: 'Tutor aguarda contato para retirada.',
+            requestType: 'agora',
+            status: 'pronto_para_entrega',
+            history: [
+                { date: faker.date.recent({ days: 8 }).toISOString(), action: 'Solicitação criada', user: 'Camila Santos' },
+                { date: faker.date.recent({ days: 6 }).toISOString(), action: 'Pet cremado', user: 'Cremador (Teste)' },
+                { date: faker.date.recent({ days: 5 }).toISOString(), action: 'Sacola montada', user: 'Cremador (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 10 }).toISOString(),
+            realWeight: 28.0,
+            contactedByFinance: true,
+            cremationCompany: 'PETCÈU',
+            cremationDate: faker.date.recent({ days: 6 }).toISOString().split('T')[0],
+            bagAssemblyDetails: {
+                standardUrn: { included: true, productName: 'Urna Padrão - G', quantity: 1 },
+                pawPrint: { included: true, productName: 'Kit Patinha em Resina', quantity: 1 },
+            },
+            assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
+        },
+        {
+            code: `PRONTO_2`,
+            createdById: 'pf_123',
+            modality: 'individual_prata',
+            tutor: { name: 'Ricardo Mendes', cpfOrCnpj: '444.555.666-77', phone: '41987654321', email: 'ricardo@example.com' },
+            pet: { name: 'Mia', species: 'gato', breed: 'Siamês', gender: 'femea', weight: '0-5kg', causeOfDeath: 'Natural' },
+            removalAddress: { street: 'Avenida Sete de Setembro', city: 'Curitiba', state: 'PR', cep: '80230-000', number: '2000', neighborhood: 'Batel' },
+            additionals: [],
+            paymentMethod: 'pix',
+            value: 480.00,
+            observations: 'Aguardando contato para agendar entrega.',
+            requestType: 'agora',
+            status: 'pronto_para_entrega',
+            history: [
+                { date: faker.date.recent({ days: 5 }).toISOString(), action: 'Solicitação criada', user: 'Ricardo Mendes' },
+                { date: faker.date.recent({ days: 3 }).toISOString(), action: 'Pet cremado', user: 'Cremador (Teste)' },
+                { date: faker.date.recent({ days: 2 }).toISOString(), action: 'Sacola montada', user: 'Cremador (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 7 }).toISOString(),
+            realWeight: 4.2,
+            contactedByFinance: true,
+            cremationCompany: undefined,
+            cremationDate: undefined,
+            bagAssemblyDetails: {
+                standardUrn: { included: true, productName: 'Urna Padrão - P', quantity: 1 },
+                pawPrint: { included: false },
+            },
+            assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
+        },
+        {
+            code: `PRONTO_3`,
+            createdById: 'pf_123',
+            modality: 'individual_prata',
+            tutor: { name: 'Juliana Ferreira', cpfOrCnpj: '888.999.000-11', phone: '41998877665', email: 'juliana@example.com' },
+            pet: { name: 'Bolinha', species: 'cachorro', breed: 'Pug', gender: 'macho', weight: '6-10kg', causeOfDeath: 'Complicações cardíacas' },
+            removalAddress: { street: 'Rua da Cidadania', city: 'Pinhais', state: 'PR', cep: '83323-000', number: '50', neighborhood: 'Centro' },
+            additionals: [],
+            paymentMethod: 'dinheiro',
+            value: 780.00,
+            observations: 'Tutor já foi avisado e irá retirar na unidade.',
+            requestType: 'agora',
+            status: 'pronto_para_entrega',
+            history: [
+                { date: faker.date.recent({ days: 4 }).toISOString(), action: 'Solicitação criada', user: 'Juliana Ferreira' },
+                { date: faker.date.recent({ days: 2 }).toISOString(), action: 'Pet cremado', user: 'Cremador (Teste)' },
+                { date: faker.date.recent({ days: 1 }).toISOString(), action: 'Sacola montada', user: 'Cremador (Teste)' },
+                { date: faker.date.recent({ days: 1 }).toISOString(), action: 'Financeiro Junior (Teste) notificou o tutor sobre a retirada via WhatsApp.', user: 'Financeiro Junior (Teste)' },
+            ],
+            createdAt: faker.date.recent({ days: 6 }).toISOString(),
+            realWeight: 9.5,
+            contactedByFinance: true,
+            cremationCompany: 'SQP',
+            cremationDate: faker.date.recent({ days: 2 }).toISOString().split('T')[0],
+            bagAssemblyDetails: {
+                standardUrn: { included: true, productName: 'Urna Padrão - P', quantity: 1 },
+                pawPrint: { included: false },
+            },
+            assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
+        },
+    ];
+    mockRemovals.push(...prontoParaEntregaRemovals);
 
     // Gerar 5 remoções individuais finalizadas para o cremador
     for (let i = 0; i < 5; i++) {

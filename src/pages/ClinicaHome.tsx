@@ -10,6 +10,9 @@ import RemovalDetailsModal from '../components/RemovalDetailsModal';
 import FaturamentoCard from '../components/cards/FaturamentoCard';
 import FaturamentoModal from '../components/modals/FaturamentoModal';
 import { exportToExcel } from '../utils/exportToExcel';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import MonthlyBatchCard from '../components/cards/MonthlyBatchCard';
 
 const ClinicaHome: React.FC = () => {
   const navigate = useNavigate();
@@ -60,8 +63,30 @@ const ClinicaHome: React.FC = () => {
     return clinicRemovals.filter(r => r.status === activeTab);
   }, [activeTab, clinicRemovals]);
 
+  const removalsGroupedByMonth = useMemo(() => {
+    if (activeTab !== 'todas') return null;
+
+    const grouped = clinicRemovals.reduce((acc, removal) => {
+        const monthYear = format(new Date(removal.createdAt), 'MMMM yyyy', { locale: ptBR });
+        const capitalizedMonthYear = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+        if (!acc[capitalizedMonthYear]) {
+            acc[capitalizedMonthYear] = [];
+        }
+        acc[capitalizedMonthYear].push(removal);
+        return acc;
+    }, {} as { [key: string]: Removal[] });
+
+    return Object.entries(grouped).sort(([monthA], [monthB]) => {
+        const dateA = new Date(grouped[monthA][0].createdAt);
+        const dateB = new Date(grouped[monthB][0].createdAt);
+        return dateB.getTime() - dateA.getTime();
+    });
+  }, [activeTab, clinicRemovals]);
+
   const handleDownload = () => {
-    if (activeTab === 'boleto_recebido') {
+    if (activeTab === 'todas') {
+        exportToExcel(clinicRemovals, `historico_clinica_todas`);
+    } else if (activeTab === 'boleto_recebido') {
         const removalsInLotes = faturamentoLotes.flatMap(lote => lote.removals);
         exportToExcel(removalsInLotes, `historico_clinica_${activeTab}`);
     } else {
@@ -124,28 +149,47 @@ const ClinicaHome: React.FC = () => {
           </div>
 
           <div className="p-6">
-            {activeTab === 'boleto_recebido' && faturamentoLotes.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {faturamentoLotes.map(lote => (
-                        <FaturamentoCard key={lote.id} lote={lote} onGerenciar={() => setSelectedLote(lote)} />
-                    ))}
-                </div>
-            )}
-            {filteredRemovals.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredRemovals.map(removal => (
-                  <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />
-                ))}
-              </div>
-            ) : (activeTab !== 'boleto_recebido' &&
-              <div className="text-center py-12 text-gray-500">
-                <p>Nenhuma remoção encontrada nesta categoria.</p>
-              </div>
-            )}
-            {activeTab === 'boleto_recebido' && faturamentoLotes.length === 0 && (
-                <div className="text-center py-12 text-gray-500">
-                    <p>Nenhum boleto recebido para pagamento.</p>
-                </div>
+            {activeTab === 'todas' ? (
+                removalsGroupedByMonth && removalsGroupedByMonth.length > 0 ? (
+                    <div className="space-y-6">
+                        {removalsGroupedByMonth.map(([month, monthRemovals]) => (
+                            <MonthlyBatchCard
+                                key={month}
+                                month={month}
+                                removals={monthRemovals}
+                                onSelectRemoval={setSelectedRemoval}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-12 text-gray-500">
+                        <p>Nenhuma remoção encontrada.</p>
+                    </div>
+                )
+            ) : activeTab === 'boleto_recebido' ? (
+                faturamentoLotes.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {faturamentoLotes.map(lote => (
+                            <FaturamentoCard key={lote.id} lote={lote} onGerenciar={() => setSelectedLote(lote)} />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-12 text-gray-500">
+                        <p>Nenhum boleto recebido para pagamento.</p>
+                    </div>
+                )
+            ) : (
+                filteredRemovals.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredRemovals.map(removal => (
+                            <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-12 text-gray-500">
+                        <p>Nenhuma remoção encontrada nesta categoria.</p>
+                    </div>
+                )
             )}
           </div>
         </div>

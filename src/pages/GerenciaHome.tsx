@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import { useRemovals } from '../context/RemovalContext';
 import Layout from '../components/Layout';
 import { BarChart, TrendingUp, XCircle, DollarSign, FileText, Layers, Shield } from 'lucide-react';
+import CompareMonths from '../components/gerencia/CompareMonths';
 
 const GerenciaHome: React.FC = () => {
   const { removals } = useRemovals();
@@ -146,9 +147,7 @@ const GerenciaHome: React.FC = () => {
             </div>
           )}
           {activeTab === 'comparativo' && (
-            <div className="text-center text-gray-500 py-12">
-              <p>A funcionalidade de comparação mês a mês será implementada em breve.</p>
-            </div>
+            <CompareMonths />
           )}
         </div>
       </div>

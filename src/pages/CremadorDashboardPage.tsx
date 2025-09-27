@@ -3,15 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
-import { Plus, Download, ArrowLeft, PlayCircle, CheckCircle, Flame, Box, Send, Check, ClipboardCheck } from 'lucide-react';
+import { Plus, Download, ArrowLeft, PlayCircle, CheckCircle, Flame, Box, Send, ClipboardCheck, PackagePlus } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import CreateCremationBatchModal from '../components/modals/CreateCremationBatchModal';
 import { exportCremationHistoryToExcel } from '../utils/exportToExcel';
 import { Removal } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
+import AssembleBagModal from '../components/modals/AssembleBagModal';
 
-type CremadorTab = 'ag_cremacao' | 'liberado_cremacao' | 'ag_liberacao' | 'liberado_sqp' | 'cremado_petceu';
+type CremadorTab = 'ag_cremacao' | 'liberado_cremacao' | 'montar_sacola' | 'ag_liberacao' | 'liberado_sqp';
 
 const CremadorDashboardPage: React.FC = () => {
     const navigate = useNavigate();
@@ -20,6 +21,7 @@ const CremadorDashboardPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<CremadorTab>('ag_cremacao');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
+    const [assembleBagModal, setAssembleBagModal] = useState<{ isOpen: boolean; removal: Removal | null }>({ isOpen: false, removal: null });
 
     const isDownloadDay = useMemo(() => {
         const day = new Date().getDay(); // 0 (Sun) to 6 (Sat)
@@ -42,12 +44,12 @@ const CremadorDashboardPage: React.FC = () => {
         switch (activeTab) {
             case 'liberado_cremacao':
                 return removals.filter(r => r.status === 'finalizada' && r.modality.includes('individual'));
+            case 'montar_sacola':
+                return removals.filter(r => r.status === 'cremado' && r.modality.includes('individual'));
             case 'ag_liberacao':
                 return removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality === 'coletivo');
             case 'liberado_sqp':
                 return removals.filter(r => r.status === 'aguardando_baixa_master' && r.cremationCompany === 'SQP');
-            case 'cremado_petceu':
-                return removals.filter(r => r.status === 'cremado' && r.cremationCompany === 'PETCÈU');
             default:
                 return [];
         }
@@ -56,10 +58,18 @@ const CremadorDashboardPage: React.FC = () => {
     const tabs: { id: CremadorTab; label: string; icon: React.ElementType }[] = [
         { id: 'ag_cremacao', label: 'AG Cremação (Lotes)', icon: Flame },
         { id: 'liberado_cremacao', label: 'Liberado Cremação', icon: ClipboardCheck },
+        { id: 'montar_sacola', label: 'Montar Sacola', icon: PackagePlus },
         { id: 'ag_liberacao', label: 'AG Liberação (Coletivas)', icon: Box },
         { id: 'liberado_sqp', label: 'Liberado SQP', icon: Send },
-        { id: 'cremado_petceu', label: 'Cremado PETCÉU', icon: Check },
     ];
+
+    const handleCardClick = (removal: Removal) => {
+        if (activeTab === 'montar_sacola') {
+            setAssembleBagModal({ isOpen: true, removal: removal });
+        } else {
+            setSelectedRemoval(removal);
+        }
+    };
 
     return (
         <Layout title="Painel do Cremador">
@@ -137,7 +147,7 @@ const CremadorDashboardPage: React.FC = () => {
                     {activeTab !== 'ag_cremacao' && (
                         filteredRemovals.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />)}
+                                {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => handleCardClick(removal)} />)}
                             </div>
                         ) : (
                             <p className="text-center text-gray-500 py-12">Nenhuma remoção nesta categoria.</p>
@@ -148,6 +158,13 @@ const CremadorDashboardPage: React.FC = () => {
 
             {isModalOpen && <CreateCremationBatchModal onClose={() => setIsModalOpen(false)} operatorName={user?.name || 'Desconhecido'} />}
             <RemovalDetailsModal removal={selectedRemoval} onClose={() => setSelectedRemoval(null)} />
+            {assembleBagModal.isOpen && assembleBagModal.removal && (
+                <AssembleBagModal
+                    isOpen={assembleBagModal.isOpen}
+                    onClose={() => setAssembleBagModal({ isOpen: false, removal: null })}
+                    removal={assembleBagModal.removal}
+                />
+            )}
         </Layout>
     );
 };

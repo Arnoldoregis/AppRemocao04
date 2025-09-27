@@ -2,12 +2,15 @@ import React, { createContext, useContext, useState, ReactNode, useCallback, use
 import { Removal, FarewellSchedule } from '../types';
 import { useRemovals } from './RemovalContext';
 import { useNotifications } from './NotificationContext';
+import { useAuth } from './AuthContext';
 import { parse, addMinutes, isAfter } from 'date-fns';
 
 interface AgendaContextType {
   schedule: FarewellSchedule;
+  dirtySlots: Set<string>;
   scheduleFarewell: (slotKey: string, removal: Removal) => void;
   removeFarewell: (slotKey: string) => void;
+  saveScheduledChanges: () => void;
 }
 
 const AgendaContext = createContext<AgendaContextType | undefined>(undefined);
@@ -22,14 +25,17 @@ export const useAgenda = () => {
 
 export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [schedule, setSchedule] = useState<FarewellSchedule>({});
+  const [dirtySlots, setDirtySlots] = useState<Set<string>>(new Set());
   const { updateRemoval } = useRemovals();
   const { addNotification } = useNotifications();
+  const { user } = useAuth();
 
   const scheduleFarewell = useCallback((slotKey: string, removal: Removal) => {
     setSchedule(prev => ({
       ...prev,
       [slotKey]: removal,
     }));
+    setDirtySlots(prev => new Set(prev).add(slotKey));
   }, []);
 
   const removeFarewell = useCallback((slotKey: string) => {
@@ -38,68 +44,100 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       delete newSchedule[slotKey];
       return newSchedule;
     });
+    setDirtySlots(prev => {
+        const newDirty = new Set(prev);
+        newDirty.delete(slotKey);
+        return newDirty;
+    });
   }, []);
+
+  const saveScheduledChanges = useCallback(() => {
+    if (!user) return;
+    const userName = user.name.split(' ')[0];
+
+    dirtySlots.forEach(slotKey => {
+      const removal = schedule[slotKey];
+      if (removal && removal.status === 'aguardando_financeiro_junior') {
+        updateRemoval(removal.code, {
+          status: 'aguardando_baixa_master',
+          history: [
+            ...removal.history,
+            {
+              date: new Date().toISOString(),
+              action: `Despedida agendada por ${userName}. Encaminhado para o Operacional.`,
+              user: user.name,
+            },
+          ],
+        });
+        addNotification(
+          `Despedida para a remoção ${removal.code} foi agendada.`,
+          { recipientRole: 'operacional' }
+        );
+      }
+    });
+
+    setDirtySlots(new Set());
+    alert('Alterações salvas com sucesso!');
+  }, [dirtySlots, schedule, updateRemoval, addNotification, user]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
-      
-      // Use functional update to get the latest schedule state inside the interval
-      setSchedule(currentSchedule => {
-        let scheduleChanged = false;
-        const nextSchedule = { ...currentSchedule };
+      const slotsToRemove: string[] = [];
+      const removalsToUpdate: Removal[] = [];
 
-        Object.entries(currentSchedule).forEach(([slotKey, removal]) => {
-          // Example slotKey: "2025-09-23-14:00"
-          const timePart = slotKey.split('-')[3];
-          if (!timePart || timePart === 'ENCAIXE EMERGÊNCIA') {
-            return; // Skip non-timed slots
+      Object.entries(schedule).forEach(([slotKey, removal]) => {
+        const timePart = slotKey.split('-')[3];
+        if (!timePart || timePart === 'ENCAIXE EMERGÊNCIA') return;
+        try {
+          const scheduledDateTime = parse(slotKey, 'yyyy-MM-dd-HH:mm', new Date());
+          const releaseTime = addMinutes(scheduledDateTime, 30);
+          if (isAfter(now, releaseTime)) {
+            slotsToRemove.push(slotKey);
+            removalsToUpdate.push(removal);
           }
+        } catch (error) {
+          console.error(`Error processing schedule slot ${slotKey}:`, error);
+        }
+      });
 
-          try {
-            const scheduledDateTime = parse(slotKey, 'yyyy-MM-dd-HH:mm', new Date());
-            const releaseTime = addMinutes(scheduledDateTime, 30);
-
-            if (isAfter(now, releaseTime)) {
-              // Update removal status to move it back to Operacional's "Aguardando Liberação" tab
-              updateRemoval(removal.code, {
-                history: [
-                  ...removal.history,
-                  {
-                    date: new Date().toISOString(),
-                    action: 'Despedida finalizada. Retornado para a fila de liberação de cremação.',
-                    user: 'Sistema',
-                  },
-                ],
-              });
-
-              // Notify the operational team
-              addNotification(
-                `Despedida da remoção ${removal.code} finalizada. Aguardando liberação para cremação.`,
-                { recipientRole: 'operacional' }
-              );
-              
-              // Prepare to remove from schedule
-              delete nextSchedule[slotKey];
-              scheduleChanged = true;
-            }
-          } catch (error) {
-            console.error(`Error processing schedule slot ${slotKey}:`, error);
-          }
+      if (slotsToRemove.length > 0) {
+        removalsToUpdate.forEach(removal => {
+          updateRemoval(removal.code, {
+            history: [
+              ...removal.history,
+              {
+                date: new Date().toISOString(),
+                action: 'Despedida finalizada. Retornado para a fila de liberação de cremação.',
+                user: 'Sistema',
+              },
+            ],
+          });
+          addNotification(
+            `Despedida da remoção ${removal.code} finalizada. Aguardando liberação para cremação.`,
+            { recipientRole: 'operacional' }
+          );
         });
 
-        // Only update state if something actually changed
-        return scheduleChanged ? nextSchedule : currentSchedule;
-      });
-    }, 60 * 1000); // Check every minute
+        setSchedule(prevSchedule => {
+          const newSchedule = { ...prevSchedule };
+          slotsToRemove.forEach(key => {
+            delete newSchedule[key];
+          });
+          return newSchedule;
+        });
+      }
+    }, 60 * 1000);
 
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, [updateRemoval, addNotification]);
+    return () => clearInterval(interval);
+  }, [schedule, updateRemoval, addNotification]);
 
   const value = {
     schedule,
+    dirtySlots,
     scheduleFarewell,
     removeFarewell,
+    saveScheduledChanges,
   };
 
   return <AgendaContext.Provider value={value}>{children}</AgendaContext.Provider>;

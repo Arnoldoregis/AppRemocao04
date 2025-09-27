@@ -3,9 +3,11 @@ import { Removal, CustomAdditional } from '../../types';
 import { useRemovals } from '../../context/RemovalContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAgenda } from '../../context/AgendaContext';
-import { CheckCircle, Edit, Upload, Plus, Trash2, Save, Flame, Minus, Undo, Building, Award } from 'lucide-react';
-import { priceTable, collectiveAdditionals } from '../../data/pricing';
+import { usePricing } from '../../context/PricingContext';
+import { CheckCircle, Edit, Upload, Plus, Trash2, Save, Flame, Minus, Undo, Building, Award, MessageSquare, Send } from 'lucide-react';
+import { collectiveAdditionals } from '../../data/pricing';
 import CertificateModal from '../modals/CertificateModal';
+import CremationDataModal from '../modals/CremationDataModal';
 
 interface FinanceiroJuniorActionsProps {
   removal: Removal;
@@ -27,6 +29,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const { updateRemoval } = useRemovals();
   const { user } = useAuth();
   const { schedule } = useAgenda();
+  const { priceTable } = usePricing();
   
   // States
   const [items, setItems] = useState<CustomAdditional[]>([]);
@@ -43,7 +46,9 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const [cremationDate, setCremationDate] = useState('');
   const [certificateObs, setCertificateObs] = useState('');
   const [isConfirmingFinalization, setIsConfirmingFinalization] = useState(false);
+  const [isConfirmingDeliveryFinalization, setIsConfirmingDeliveryFinalization] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
+  const [isCremationDataModalOpen, setIsCremationDataModalOpen] = useState(false);
 
   const isCollective = removal.modality === 'coletivo';
 
@@ -82,7 +87,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     } else {
       setModalityDifference(0);
     }
-  }, [newModality, activeEditTab, removal]);
+  }, [newModality, activeEditTab, removal, priceTable]);
 
   const resetAndCloseEdit = () => {
     setIsEditing(false);
@@ -108,11 +113,43 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     onClose();
   };
 
+  const handleFinalizeDeliveryForMaster = () => {
+    if (!user) return;
+    updateRemoval(removal.code, {
+        status: 'aguardando_baixa_master',
+        history: [
+            ...removal.history,
+            {
+                date: new Date().toISOString(),
+                action: `Pronto para entrega. Finalizado para Master por ${user.name.split(' ')[0]}.`,
+                user: user.name,
+            },
+        ],
+    });
+    onClose();
+  };
+
   const handleReturnToOperational = () => {
     if (!user) return;
     updateRemoval(removal.code, {
       status: 'aguardando_baixa_master',
       history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} retornou a remoção para o Operacional.`, user: user.name }],
+    });
+    onClose();
+  };
+
+  const handleSendToRelease = () => {
+    if (!user) return;
+    updateRemoval(removal.code, {
+      status: 'aguardando_baixa_master',
+      history: [
+        ...removal.history,
+        {
+          date: new Date().toISOString(),
+          action: `Enviado para liberação de cremação sem despedida pelo Fin. Junior ${user.name.split(' ')[0]}`,
+          user: user.name,
+        },
+      ],
     });
     onClose();
   };
@@ -242,16 +279,148 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     resetAndCloseEdit();
   };
 
+  const handleNotifyTutor = () => {
+    if (!user || !removal.tutor.phone) {
+        alert('Número de contato do tutor não encontrado.');
+        return;
+    }
+
+    const tutorName = removal.tutor.name;
+    const message = `Olá ${tutorName}, seu anjinho ja esta pronto para retirada ou entrega. Nosso horario de atendimento para retirada é de segunda a sexta as 9hs até as 17hs e sabado das 8:30hs até as 11:30hs, a unidade de retirada fica na Rua Santa Helena 51 Centro Pinhais Cep 83.324-220. Se quiser optar por entrega via motoboy, term um custo de 30,00 reais para a entrega. Favor nos acionar respondento a qual opção é melhor. Lembrando que para a entrega temos agendamento, verificar disponibilidade.`;
+
+    const cleanedPhone = removal.tutor.phone.replace(/\D/g, '');
+    const whatsappUrl = `https://wa.me/55${cleanedPhone}?text=${encodeURIComponent(message)}`;
+
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+
+    updateRemoval(removal.code, {
+        history: [
+            ...removal.history,
+            {
+                date: new Date().toISOString(),
+                action: `Financeiro Junior ${user.name.split(' ')[0]} notificou o tutor sobre a retirada via WhatsApp.`,
+                user: user.name,
+            },
+        ],
+    });
+  };
+
+  const handleGenerateCertificate = () => {
+    if (!removal.cremationDate || !removal.cremationCompany) {
+      setIsCremationDataModalOpen(true);
+    } else {
+      setIsCertificateModalOpen(true);
+    }
+  };
+
+  const handleConfirmCremationData = (data: { date: string; company: 'PETCÈU' | 'SQP' }) => {
+    if (!user) return;
+    const [year, month, day] = data.date.split('-');
+    const formattedDate = `${day}/${month}/${year}`;
+
+    const updates: Partial<Removal> = {};
+    const historyActions: string[] = [];
+
+    if (!removal.cremationDate && data.date) {
+        updates.cremationDate = data.date;
+        historyActions.push(`data de cremação definida para ${formattedDate}`);
+    }
+    if (!removal.cremationCompany && data.company) {
+        updates.cremationCompany = data.company;
+        historyActions.push(`empresa de cremação definida para ${data.company}`);
+    }
+
+    if (historyActions.length > 0) {
+        updateRemoval(removal.code, {
+          ...updates,
+          history: [
+            ...removal.history,
+            {
+              date: new Date().toISOString(),
+              action: `Financeiro Junior ${user.name.split(' ')[0]} atualizou dados para certificado: ${historyActions.join(' e ')}.`,
+              user: user.name,
+            },
+          ],
+        });
+    }
+    
+    setIsCremationDataModalOpen(false);
+    setTimeout(() => {
+        setIsCertificateModalOpen(true);
+    }, 100);
+  };
+
+  // Handle 'Pronto para Entrega' tab
+  if (removal.status === 'pronto_para_entrega') {
+    const tutorNotified = removal.history.some(h => h.action.includes('notificou o tutor'));
+
+    if (isConfirmingDeliveryFinalization) {
+        return (
+            <div className="w-full p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+                <h4 className="font-semibold text-yellow-900 mb-3 text-center">Tem certeza que deseja finalizar e enviar para o Master?</h4>
+                <div className="flex gap-2">
+                    <button onClick={() => setIsConfirmingDeliveryFinalization(false)} className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400">NÃO</button>
+                    <button onClick={handleFinalizeDeliveryForMaster} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">SIM</button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <>
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={handleGenerateCertificate}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-2"
+                >
+                    <Award size={16} /> Gerar Certificado
+                </button>
+                <button
+                    onClick={handleNotifyTutor}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                >
+                    <MessageSquare size={16} /> Avisar Tutor
+                </button>
+                {tutorNotified && (
+                    <button
+                        onClick={() => setIsConfirmingDeliveryFinalization(true)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+                    >
+                        <Send size={16} /> Finalizar para Master
+                    </button>
+                )}
+            </div>
+            <CremationDataModal
+                isOpen={isCremationDataModalOpen}
+                onClose={() => setIsCremationDataModalOpen(false)}
+                onConfirm={handleConfirmCremationData}
+                removal={removal}
+            />
+            <CertificateModal
+                isOpen={isCertificateModalOpen}
+                onClose={() => setIsCertificateModalOpen(false)}
+                removal={removal}
+            />
+        </>
+    );
+  }
+
   // Handle 'Finalizadas' tab (status: aguardando_baixa_master)
   if (removal.status === 'aguardando_baixa_master') {
     return (
         <>
             <button
-                onClick={() => setIsCertificateModalOpen(true)}
+                onClick={handleGenerateCertificate}
                 className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-2"
             >
                 <Award size={16} /> Gerar Certificado
             </button>
+            <CremationDataModal
+                isOpen={isCremationDataModalOpen}
+                onClose={() => setIsCremationDataModalOpen(false)}
+                onConfirm={handleConfirmCremationData}
+                removal={removal}
+            />
             <CertificateModal
                 isOpen={isCertificateModalOpen}
                 onClose={() => setIsCertificateModalOpen(false)}
@@ -311,10 +480,24 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
           </div>
       );
     }
+
+    const isScheduled = Object.values(schedule).some(scheduledRemoval => scheduledRemoval.code === removal.code);
+
     return (
       <div className="flex items-center gap-2">
         <button onClick={() => { setActiveEditTab('add'); setIsEditing(true); }} className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 flex items-center gap-2"><Edit size={16} /> Adicionar/Editar</button>
+        
+        {!isCollective && !isScheduled && (
+          <button
+            onClick={handleSendToRelease}
+            className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 flex items-center gap-2"
+          >
+            <Send size={16} /> Enviar p/ Liberação
+          </button>
+        )}
+
         {isCollective && <button onClick={handleReturnToOperational} className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 flex items-center gap-2"><Undo size={16} /> Retornar / Operacional</button>}
+        
         <button onClick={() => setIsConfirmingFinalization(true)} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"><CheckCircle size={16} /> Finalizar para Master</button>
       </div>
     );

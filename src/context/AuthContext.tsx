@@ -23,16 +23,6 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const employeeRoles: { [key: string]: User['role'] } = {
-  'adm@gmail.com': 'administrador',
-  'receptor@gmail.com': 'receptor',
-  'motorista@gmail.com': 'motorista',
-  'financeirojunior@gmail.com': 'financeiro_junior',
-  'financeiromaster@gmail.com': 'financeiro_master',
-  'gerencia@gmail.com': 'gerencia',
-  'operacional@gmail.com': 'operacional',
-};
-
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
@@ -79,9 +69,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       };
     } else if (userType === 'funcionarios') {
-      const role = employeeRoles[email.toLowerCase()];
-      if (role === 'motorista') {
-        const driverData = mockDrivers.find(d => d.email === email.toLowerCase());
+        // Tenta logar como motorista específico primeiro
+        const driverData = mockDrivers.find(d => d.email.toLowerCase() === email.toLowerCase());
         if (driverData) {
             mockUser = {
                 id: driverData.id,
@@ -89,29 +78,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 name: driverData.name,
                 userType: 'funcionario',
                 role: 'motorista',
-                phone: '(41) 55555-4444',
+                phone: driverData.phone,
                 address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' }
             };
+        } else {
+            // Lógica para outros funcionários com logins compartilhados
+            const roleRegex = /^(administrador|receptor|financeiro_?junior|financeiro_?master|gerencia|operacional)(\d*)@gmail\.com$/i;
+            const match = email.toLowerCase().match(roleRegex);
+
+            if (match) {
+                let roleStr = match[1];
+                
+                // Normaliza o nome do papel para corresponder ao tipo User['role']
+                if (roleStr === 'financeirojunior') roleStr = 'financeiro_junior';
+                if (roleStr === 'financeiromaster') roleStr = 'financeiro_master';
+
+                const role = roleStr as User['role'];
+                const number = match[2] || '1'; // Se não houver número, assume 1
+                
+                mockUser = {
+                    id: `func_${role}_${number}`,
+                    email: email,
+                    name: `${role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ')} ${number} (Teste)`,
+                    userType: 'funcionario',
+                    role: role,
+                    phone: `(41) 9${number}${number}${number}${number}${number}-0000`,
+                    address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' }
+                };
+            }
         }
-      } else if (role) {
-        mockUser = {
-          id: `func_${role}_789`,
-          email: email,
-          name: `${role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ')} (Teste)`,
-          userType: 'funcionario',
-          role: role,
-          phone: '(41) 11111-2222',
-          address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' }
-        };
-      }
     }
 
     if (mockUser) {
       setUser(mockUser);
-      return mockUser; // Retorna o objeto do usuário em caso de sucesso
+      return mockUser;
     }
 
-    return null; // Retorna nulo em caso de falha
+    return null;
   };
 
   const logout = () => {

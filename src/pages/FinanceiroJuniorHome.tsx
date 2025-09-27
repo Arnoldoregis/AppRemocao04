@@ -2,8 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
 import { useAgenda } from '../context/AgendaContext';
+import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
-import { CalendarDays, Download, Search, Filter } from 'lucide-react';
+import { CalendarDays, Download, Search, Filter, PackageCheck } from 'lucide-react';
 import { Removal } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
@@ -12,6 +13,7 @@ import { exportToExcel } from '../utils/exportToExcel';
 const FinanceiroJuniorHome: React.FC = () => {
   const { removals } = useRemovals();
   const { schedule } = useAgenda();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>('coletivas');
   const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
@@ -32,28 +34,32 @@ const FinanceiroJuniorHome: React.FC = () => {
   }, [activeTab]);
 
   const filteredRemovals = useMemo(() => {
+    if (!user) return [];
     let baseFiltered: Removal[] = [];
     
     // Main category filtering
     switch (activeTab) {
         case 'coletivas':
-            baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality === 'coletivo');
+            baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality === 'coletivo' && r.assignedFinanceiroJunior?.id === user.id);
             break;
         case 'individuais':
-            baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality !== 'coletivo');
+            baseFiltered = removals.filter(r => r.status === 'aguardando_financeiro_junior' && r.modality !== 'coletivo' && r.assignedFinanceiroJunior?.id === user.id);
             break;
         case 'agendado_despedida':
-            baseFiltered = Object.values(schedule);
+            baseFiltered = Object.values(schedule).filter(r => r.assignedFinanceiroJunior?.id === user.id);
+            break;
+        case 'pronto_para_entrega':
+            baseFiltered = removals.filter(r => r.status === 'pronto_para_entrega' && r.assignedFinanceiroJunior?.id === user.id);
             break;
         case 'finalizadas':
-            baseFiltered = removals.filter(r => r.status === 'aguardando_baixa_master');
+            baseFiltered = removals.filter(r => r.status === 'aguardando_baixa_master' && r.assignedFinanceiroJunior?.id === user.id);
             break;
         default:
             baseFiltered = [];
     }
 
     // Payment method sub-filtering
-    if (paymentFilter !== 'todos' && activeTab !== 'agendado_despedida') {
+    if (paymentFilter !== 'todos' && !['agendado_despedida', 'pronto_para_entrega'].includes(activeTab)) {
         if (paymentFilter === 'faturado') {
             baseFiltered = baseFiltered.filter(r => r.paymentMethod === 'faturado');
         } else { // 'convencional'
@@ -72,7 +78,7 @@ const FinanceiroJuniorHome: React.FC = () => {
     }
 
     return baseFiltered;
-  }, [activeTab, removals, searchTerm, schedule, paymentFilter]);
+  }, [activeTab, removals, searchTerm, schedule, paymentFilter, user]);
 
   const handleDownload = () => {
     exportToExcel(filteredRemovals, `historico_fin_junior_${activeTab}`);
@@ -82,6 +88,7 @@ const FinanceiroJuniorHome: React.FC = () => {
     { id: 'coletivas', label: 'Coletivas/Faturado' },
     { id: 'individuais', label: 'Individuais/Faturado' },
     { id: 'agendado_despedida', label: 'Agendado Despedida' },
+    { id: 'pronto_para_entrega', label: 'Pronto p/ Entrega', icon: PackageCheck },
     { id: 'finalizadas', label: 'Finalizadas' },
   ];
 
@@ -125,7 +132,8 @@ const FinanceiroJuniorHome: React.FC = () => {
         <div className="border-b">
           <nav className="flex flex-wrap -mb-px">
             {tabs.map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-3 font-medium text-sm border-b-2 ${activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-3 font-medium text-sm border-b-2 flex items-center gap-2 ${activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                {tab.icon && <tab.icon size={16} />}
                 {tab.label}
               </button>
             ))}
