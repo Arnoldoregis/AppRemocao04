@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Removal, CustomAdditional } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Removal, CustomAdditional, StockItem } from '../../types';
 import { useRemovals } from '../../context/RemovalContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAgenda } from '../../context/AgendaContext';
 import { usePricing } from '../../context/PricingContext';
-import { CheckCircle, Edit, Upload, Plus, Trash2, Save, Flame, Minus, Undo, Building, Award, MessageSquare, Send } from 'lucide-react';
-import { collectiveAdditionals } from '../../data/pricing';
+import { useStock } from '../../context/StockContext';
+import { CheckCircle, Edit, Upload, Trash2, Save, Flame, Undo, Building, Award, MessageSquare, Send, Search, Plus, Minus } from 'lucide-react';
 import CertificateModal from '../modals/CertificateModal';
 import CremationDataModal from '../modals/CremationDataModal';
+
+interface EditableProduct extends Omit<CustomAdditional, 'id'> {
+  productId: string;
+  quantity: number;
+}
 
 interface FinanceiroJuniorActionsProps {
   removal: Removal;
@@ -30,11 +35,11 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const { user } = useAuth();
   const { schedule } = useAgenda();
   const { priceTable } = usePricing();
+  const { stock } = useStock();
   
   // States
-  const [items, setItems] = useState<CustomAdditional[]>([]);
-  const [productName, setProductName] = useState('');
-  const [productValue, setProductValue] = useState('');
+  const [items, setItems] = useState<EditableProduct[]>([]);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [adjustmentType, setAdjustmentType] = useState<'receber' | 'devolver'>('receber');
   const [adjustmentValue, setAdjustmentValue] = useState('');
@@ -50,11 +55,34 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [isCremationDataModalOpen, setIsCremationDataModalOpen] = useState(false);
 
-  const isCollective = removal.modality === 'coletivo';
+  const searchResults = useMemo(() => {
+    if (!productSearchTerm.trim()) return [];
+    const lower = productSearchTerm.toLowerCase();
+    return stock.filter(item =>
+        item.category === 'material_venda' &&
+        (item.name.toLowerCase().includes(lower) || item.trackingCode.toLowerCase().includes(lower))
+    );
+  }, [productSearchTerm, stock]);
 
   useEffect(() => {
     if (isEditing) {
-      setItems(removal.customAdditionals || []);
+      const groupedItems = (removal.customAdditionals || []).reduce((acc, current) => {
+          const key = `${current.name}|${current.value}`;
+          const existing = acc.get(key);
+          if (existing) {
+              existing.quantity += 1;
+          } else {
+              acc.set(key, {
+                  productId: key,
+                  name: current.name,
+                  value: current.value,
+                  quantity: 1,
+              });
+          }
+          return acc;
+      }, new Map<string, EditableProduct>());
+
+      setItems(Array.from(groupedItems.values()));
       setNewModality(removal.modality);
       setCremationCompany(removal.cremationCompany);
       setCremationDate(removal.cremationDate || '');
@@ -91,7 +119,8 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
   const resetAndCloseEdit = () => {
     setIsEditing(false);
-    setProductName(''); setProductValue(''); setSelectedFile(null);
+    setItems([]);
+    setProductSearchTerm(''); setSelectedFile(null);
     setAdjustmentValue(''); setAdjustmentProof(null);
     setNewModality(removal.modality); setModalityDifference(0); setModalityProof(null);
     setCremationCompany(undefined); setCremationDate(''); setCertificateObs('');
@@ -154,84 +183,73 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     onClose();
   };
 
-  const handleAddItem = () => {
-    if (productName && productValue && items.length < 10) {
-      const processAndAddItem = (proofString?: string) => {
-        setItems([...items, { id: new Date().toISOString(), name: productName, value: parseFloat(productValue), paymentProof: proofString }]);
-        setProductName(''); setProductValue(''); setSelectedFile(null);
-        const fileInput = document.getElementById('custom-product-file-input') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
-      };
-      if (selectedFile) {
-        const reader = new FileReader();
-        reader.onload = (e) => processAndAddItem(`${e.target?.result as string}||${selectedFile.name}`);
-        reader.readAsDataURL(selectedFile);
-      } else {
-        processAndAddItem();
-      }
-    }
-  };
-
-  const handleCollectiveAddItem = (product: { name: string; value: number }) => {
-    setItems(prev => [...prev, { id: new Date().toISOString() + Math.random(), name: product.name, value: product.value }]);
-  };
-
-  const handleCollectiveRemoveItem = (productName: string) => {
+  const handleAddProductFromSearch = (product: StockItem) => {
     setItems(prev => {
-      const itemIndex = prev.findLastIndex(item => item.name === productName);
-      if (itemIndex > -1) {
-        const newItems = [...prev];
-        newItems.splice(itemIndex, 1);
-        return newItems;
-      }
-      return prev;
+        const existingItemIndex = prev.findIndex(item => item.productId === product.id);
+        if (existingItemIndex > -1) {
+            const newItems = [...prev];
+            newItems[existingItemIndex].quantity += 1;
+            return newItems;
+        } else {
+            return [...prev, {
+                productId: product.id,
+                name: product.name,
+                value: product.sellingPrice,
+                quantity: 1
+            }];
+        }
     });
+    setProductSearchTerm('');
   };
 
-  const handleRemoveItem = (id: string) => setItems(items.filter(item => item.id !== id));
+  const handleQuantityChange = (productId: string, change: number) => {
+    setItems(prev => 
+        prev.map(item => 
+            item.productId === productId
+                ? { ...item, quantity: item.quantity + change }
+                : item
+        ).filter(item => item.quantity > 0)
+    );
+  };
+
+  const handleRemoveItem = (productId: string) => {
+    setItems(prev => prev.filter(item => item.productId !== productId));
+  };
 
   const handleSaveItems = async () => {
     if (!user) return;
     let proofString: string | undefined = undefined;
-    if (isCollective && selectedFile) {
+    
+    if (selectedFile) {
         proofString = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(`${e.target?.result as string}||${selectedFile.name}`);
             reader.readAsDataURL(selectedFile);
         });
     }
-    const originalItems = removal.customAdditionals || [];
-    const processedItems = isCollective ? items.map(item => !originalItems.some(oi => oi.id === item.id) && proofString ? { ...item, paymentProof: proofString } : item) : items;
-    const addedItems = processedItems.filter(i => !originalItems.some(oi => oi.id === oi.id));
-    const removedItems = originalItems.filter(oi => !processedItems.some(i => i.id === oi.id));
-    let historyActions: string[] = [];
-    if (addedItems.length > 0) {
-        const summary = new Map<string, { count: number, hasProof: boolean, value: number }>();
-        addedItems.forEach(item => {
-            const existing = summary.get(item.name) || { count: 0, hasProof: false, value: 0 };
-            existing.count++; existing.hasProof = existing.hasProof || !!item.paymentProof; existing.value = item.value;
-            summary.set(item.name, existing);
-        });
-        const itemsSummary = Array.from(summary.entries()).map(([name, data]) => `${data.count}x ${name} (R$ ${(data.value * data.count).toFixed(2)})${data.hasProof ? ` [comprovante anexado]` : ''}`).join(', ');
-        historyActions.push(`adicionou: ${itemsSummary}`);
-    }
-    if (removedItems.length > 0) {
-        const summary = new Map<string, { count: number, value: number }>();
-        removedItems.forEach(item => {
-            const existing = summary.get(item.name) || { count: 0, value: 0 };
-            existing.count++; existing.value = item.value;
-            summary.set(item.name, existing);
-        });
-        const itemsSummary = Array.from(summary.entries()).map(([name, data]) => `${data.count}x ${name}`).join(', ');
-        historyActions.push(`removeu: ${itemsSummary}`);
-    }
-    if (historyActions.length > 0) {
-        const diff = processedItems.reduce((acc, item) => acc + item.value, 0) - originalItems.reduce((acc, item) => acc + item.value, 0);
-        updateRemoval(removal.code, {
-            customAdditionals: processedItems, value: removal.value + diff,
-            history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${historyActions.join(' e ')}.`, user: user.name }],
-        });
-    }
+
+    const newCustomAdditionals: CustomAdditional[] = items.flatMap(item => 
+        Array.from({ length: item.quantity }, (_, i) => ({
+            id: `${item.productId}_${Date.now()}_${i}`,
+            name: item.name,
+            value: item.value,
+            paymentProof: proofString 
+        }))
+    );
+
+    const newAdditionalsValue = newCustomAdditionals.reduce((sum, item) => sum + item.value, 0);
+    const oldAdditionalsValue = (removal.customAdditionals || []).reduce((sum, item) => sum + item.value, 0);
+    const valueDiff = newAdditionalsValue - oldAdditionalsValue;
+
+    const itemsSummary = items.map(item => `${item.quantity}x ${item.name}`).join(', ');
+    const historyAction = `Financeiro Junior ${user.name.split(' ')[0]} atualizou os produtos adicionais para: ${itemsSummary || 'nenhum'}.`;
+
+    updateRemoval(removal.code, {
+        customAdditionals: newCustomAdditionals,
+        value: removal.value + valueDiff,
+        history: [...removal.history, { date: new Date().toISOString(), action: historyAction, user: user.name }],
+    });
+    
     resetAndCloseEdit();
   };
   
@@ -432,6 +450,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
   // Handle 'Pendentes' tabs (status: aguardando_financeiro_junior)
   if (removal.status === 'aguardando_financeiro_junior') {
+    const isCollective = removal.modality === 'coletivo';
     if (isEditing) {
       return (
         <div className="w-full h-full flex flex-col">
@@ -442,19 +461,81 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
             <button onClick={() => setActiveEditTab('cremation')} className={`px-4 py-2 text-sm font-medium ${activeEditTab === 'cremation' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>Dados Cremação</button>
           </div>
           <div className="flex-grow overflow-y-auto p-4">
-            {activeEditTab === 'add' && (isCollective ? (
-              <div className="space-y-4">
-                <div className="space-y-3 p-3 bg-gray-50 rounded-md border">
-                  {collectiveAdditionals.map(product => (<div key={product.id} className="flex justify-between items-center py-2 border-b last:border-b-0"><div><p className="font-medium">{product.name}</p><p className="text-sm text-green-600">R$ {product.value.toFixed(2)}</p></div><div className="flex items-center gap-3"><button type="button" onClick={() => handleCollectiveRemoveItem(product.name)} className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50" disabled={items.filter(i => i.name === product.name).length === 0}><Minus size={16} /></button><span className="font-bold text-lg w-8 text-center">{items.filter(i => i.name === product.name).length}</span><button type="button" onClick={() => handleCollectiveAddItem(product)} className="p-1 rounded-full bg-green-100 text-green-600 hover:bg-green-200"><Plus size={16} /></button></div></div>))}
+            {activeEditTab === 'add' && (
+                <div className="space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">Buscar Produto de Venda</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <input
+                                type="text"
+                                value={productSearchTerm}
+                                onChange={e => setProductSearchTerm(e.target.value)}
+                                placeholder="Buscar por nome ou código..."
+                                className="w-full pl-9 pr-3 py-2 border rounded-md text-sm"
+                            />
+                            {searchResults.length > 0 && (
+                                <div className="absolute w-full bg-white border mt-1 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                                    {searchResults.map(product => (
+                                        <button
+                                            key={product.id}
+                                            type="button"
+                                            onClick={() => handleAddProductFromSearch(product)}
+                                            className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors"
+                                        >
+                                            <p className="font-semibold">{product.name}</p>
+                                            <p className="text-xs text-gray-500">
+                                                Código: {product.trackingCode} - R$ {product.sellingPrice.toFixed(2)}
+                                            </p>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <h4 className="text-sm font-semibold text-gray-800">Itens Adicionados:</h4>
+                        {items.length > 0 ? (
+                            <ul className="space-y-2">
+                                {items.map(item => (
+                                    <li key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-md border">
+                                        <div>
+                                            <p className="font-medium">{item.name}</p>
+                                            <p className="text-sm text-gray-500">R$ {item.value.toFixed(2)} / un.</p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2 border rounded-full p-1 bg-white">
+                                                <button type="button" onClick={() => handleQuantityChange(item.productId, -1)} className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200"><Minus size={12} /></button>
+                                                <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
+                                                <button type="button" onClick={() => handleQuantityChange(item.productId, 1)} className="p-1 rounded-full bg-green-100 text-green-600 hover:bg-green-200"><Plus size={12} /></button>
+                                            </div>
+                                            <p className="w-24 text-right font-semibold text-gray-700">R$ {(item.value * item.quantity).toFixed(2)}</p>
+                                            <button onClick={() => handleRemoveItem(item.productId)} className="text-red-500 hover:text-red-700 p-1"><Trash2 size={16} /></button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-gray-500 text-center py-4">Nenhum item adicionado.</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                            <Upload className="inline h-4 w-4 mr-1" />
+                            Anexar Comprovante (opcional, para todos os itens)
+                        </label>
+                        <input
+                            id="custom-product-file-input"
+                            type="file"
+                            accept=".jpg,.jpeg,.pdf"
+                            onChange={e => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                            className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                    </div>
                 </div>
-                <div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante</label><input id="collective-product-file-input" type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setSelectedFile(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-3 p-3 bg-gray-50 rounded-md border"><div className="flex gap-2 items-end"><div className="flex-grow"><label className="text-xs font-medium text-gray-600">Produto</label><input type="text" value={productName} onChange={e => setProductName(e.target.value)} placeholder="Nome do produto" className="w-full px-2 py-1 border rounded-md text-sm" /></div><div className="w-24"><label className="text-xs font-medium text-gray-600">Valor (R$)</label><input type="number" value={productValue} onChange={e => setProductValue(e.target.value)} placeholder="Valor" className="w-full px-2 py-1 border rounded-md text-sm" /></div></div><div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante</label><input id="custom-product-file-input" type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setSelectedFile(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div><button onClick={handleAddItem} disabled={items.length >= 10 || !productName || !productValue} className="w-full px-3 py-1.5 bg-blue-500 text-white rounded-md text-sm flex items-center justify-center gap-1 disabled:opacity-50"><Plus size={16} /> Adicionar Item</button></div>
-                {items.length > 0 && <div className="space-y-2"><p className="text-sm font-medium">Itens Adicionados:</p><ul className="list-disc list-inside text-sm bg-gray-100 p-3 rounded-md border">{items.map(item => (<li key={item.id} className="flex justify-between items-center py-1"><span>{item.name} - R$ {item.value.toFixed(2)}</span><button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14} /></button></li>))}</ul></div>}
-              </div>
-            ))}
+            )}
             {activeEditTab === 'adjust' && <div className="space-y-4 p-1"><div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="adjustmentType" value="receber" checked={adjustmentType === 'receber'} onChange={() => setAdjustmentType('receber')} />Receber</label><label className="flex items-center gap-2"><input type="radio" name="adjustmentType" value="devolver" checked={adjustmentType === 'devolver'} onChange={() => setAdjustmentType('devolver')} />Devolver</label></div><div><label className="text-xs font-medium text-gray-600">Valor (R$)</label><input type="number" value={adjustmentValue} onChange={e => setAdjustmentValue(e.target.value)} placeholder="Valor do ajuste" className="w-full px-2 py-1 border rounded-md text-sm" /></div><div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante</label><input type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setAdjustmentProof(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div></div>}
             {activeEditTab === 'change_modality' && <div className="space-y-4 p-1"><div><label className="text-xs font-medium text-gray-600">Nova Modalidade</label><select value={newModality} onChange={e => setNewModality(e.target.value as Removal['modality'])} className="w-full px-2 py-1 border rounded-md text-sm"><option value="coletivo">Coletivo</option><option value="individual_prata">Individual Prata</option><option value="individual_ouro">Individual Ouro</option></select></div>{modalityDifference !== 0 && <div className={`p-3 rounded-md text-sm ${modalityDifference > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>{modalityDifference > 0 ? `Valor a cobrar: R$ ${modalityDifference.toFixed(2)}` : `Valor a devolver: R$ ${Math.abs(modalityDifference).toFixed(2)}`}</div>}<div><label className="block text-xs font-medium text-gray-600 mb-1"><Upload className="inline h-4 w-4 mr-1" />Anexar Comprovante</label><input type="file" accept=".jpg,.jpeg,.pdf" onChange={e => setModalityProof(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div></div>}
             {activeEditTab === 'cremation' && <div className="space-y-4 p-1"><div><label className="text-xs font-medium text-gray-600 flex items-center mb-2"><Building className="h-4 w-4 mr-2"/>Empresa de Cremação</label><div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="cremationCompany" value="PETCÈU" checked={cremationCompany === 'PETCÈU'} onChange={() => setCremationCompany('PETCÈU')} />PETCÈU</label><label className="flex items-center gap-2"><input type="radio" name="cremationCompany" value="SQP" checked={cremationCompany === 'SQP'} onChange={() => setCremationCompany('SQP')} />SQP</label></div></div><div><label className="text-xs font-medium text-gray-600">Data da Cremação</label><input type="date" value={cremationDate} onChange={e => setCremationDate(e.target.value)} className="w-full px-2 py-1 border rounded-md text-sm" /></div><div><label className="text-xs font-medium text-gray-600">Observações para o Certificado</label><textarea value={certificateObs} onChange={e => setCertificateObs(e.target.value)} placeholder="Ex: Adicionar nome do tutor no certificado" rows={3} className="w-full px-2 py-1 border rounded-md text-sm" /></div></div>}

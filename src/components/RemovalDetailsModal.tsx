@@ -133,7 +133,7 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
                   setActiveEditTab={setActiveEditTab}
                 />;
       case 'financeiro_master':
-        if (removal.status === 'aguardando_baixa_master' && removal.paymentMethod !== 'faturado') {
+        if ((removal.status === 'aguardando_baixa_master' || removal.status === 'pronto_para_entrega') && removal.paymentMethod !== 'faturado') {
           return <FinanceiroMasterActions removal={removal} onClose={onClose} />;
         }
         return null;
