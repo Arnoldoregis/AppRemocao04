@@ -9,7 +9,8 @@ import FinanceiroJuniorActions from './actions/FinanceiroJuniorActions';
 import FinanceiroMasterActions from './actions/FinanceiroMasterActions';
 import ClinicaActions from './actions/ClinicaActions';
 import OperacionalActions from './actions/OperacionalActions';
-import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4, Flame, Building } from 'lucide-react';
+import AguardandoRetiradaActions from './actions/AguardandoRetiradaActions';
+import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4, Flame, Building, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import { downloadFile } from '../utils/downloadFile';
 
@@ -112,6 +113,10 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
   };
 
   const renderActions = () => {
+    if (removal.status === 'aguardando_retirada' && (user?.role === 'receptor' || user?.role === 'financeiro_junior')) {
+      return <AguardandoRetiradaActions removal={removal} onClose={onClose} />;
+    }
+
     if (user?.userType === 'clinica') {
         return <ClinicaActions removal={removal} onClose={onClose} />;
     }
@@ -133,7 +138,7 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
                   setActiveEditTab={setActiveEditTab}
                 />;
       case 'financeiro_master':
-        if ((removal.status === 'aguardando_baixa_master' || removal.status === 'pronto_para_entrega') && removal.paymentMethod !== 'faturado') {
+        if (removal.status === 'aguardando_baixa_master' && removal.paymentMethod !== 'faturado') {
           return <FinanceiroMasterActions removal={removal} onClose={onClose} />;
         }
         return null;
@@ -375,6 +380,19 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
             <DetailItem label="Data da Cremação" value={removal.cremationDate ? format(new Date(removal.cremationDate), 'dd/MM/yyyy') : 'Não definida'} />
             <DetailItem label="Observações para o Certificado" value={removal.certificateObservations} />
           </DetailSection>
+
+          {['aguardando_retirada', 'entrega_agendada'].includes(removal.status) && (
+            <DetailSection title="Entrega / Retirada" icon={Truck}>
+                {removal.status === 'aguardando_retirada' && (
+                    <p className="font-semibold text-orange-600">O tutor virá buscar na unidade.</p>
+                )}
+                {removal.status === 'entrega_agendada' && removal.scheduledDeliveryDate && (
+                    <p className="font-semibold text-cyan-600">
+                        Entrega agendada para: {format(new Date(removal.scheduledDeliveryDate), 'dd/MM/yyyy')}
+                    </p>
+                )}
+            </DetailSection>
+          )}
           
           <DetailSection title="Outras Informações" icon={FileText}>
              <DetailItem label="Observações" value={removal.observations} />

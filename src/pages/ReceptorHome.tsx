@@ -1,21 +1,27 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRemovals } from '../context/RemovalContext';
+import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
-import { CalendarDays, Download, Search, Plus } from 'lucide-react';
+import { CalendarDays, Download, Search, Plus, Filter, UserCheck, CalendarClock } from 'lucide-react';
 import { Removal, RemovalStatus } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
 import { exportToExcel } from '../utils/exportToExcel';
 import RequestTypeModal from '../components/modals/RequestTypeModal';
+import ScheduleDeliveryModal from '../components/modals/ScheduleDeliveryModal';
+import DeliveryCalendarView from '../components/shared/DeliveryCalendarView';
 
 const ReceptorHome: React.FC = () => {
-  const { removals } = useRemovals();
+  const { removals, updateRemoval } = useRemovals();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<RemovalStatus>('solicitada');
+  const [activeTab, setActiveTab] = useState<RemovalStatus | 'agenda_entrega'>('solicitada');
   const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [isScheduleDeliveryModalOpen, setIsScheduleDeliveryModalOpen] = useState(false);
+  const [deliveryFilter, setDeliveryFilter] = useState<'todos' | 'aguardando_retirada' | 'entrega_agendada'>('todos');
 
   useEffect(() => {
     if (selectedRemoval) {
@@ -26,8 +32,40 @@ const ReceptorHome: React.FC = () => {
     }
   }, [removals, selectedRemoval?.code]);
 
+  useEffect(() => {
+    setDeliveryFilter('todos');
+  }, [activeTab]);
+
+  const handleCancelDelivery = (removalCode: string) => {
+    if (!user) return;
+    const removalToUpdate = removals.find(r => r.code === removalCode);
+    if (!removalToUpdate) return;
+
+    updateRemoval(removalCode, {
+        status: 'pronto_para_entrega',
+        scheduledDeliveryDate: undefined,
+        history: [
+            ...removalToUpdate.history,
+            {
+                date: new Date().toISOString(),
+                action: `Agendamento de entrega cancelado por ${user.name.split(' ')[0]}.`,
+                user: user.name,
+            },
+        ],
+    });
+  };
+
   const filteredRemovals = useMemo(() => {
-    let tabFiltered = removals.filter(r => r.status === activeTab);
+    let tabFiltered: Removal[];
+
+    if (activeTab === 'agenda_entrega') {
+      tabFiltered = removals.filter(r => r.status === 'aguardando_retirada' || r.status === 'entrega_agendada');
+      if (deliveryFilter !== 'todos') {
+        tabFiltered = tabFiltered.filter(r => r.status === deliveryFilter);
+      }
+    } else {
+      tabFiltered = removals.filter(r => r.status === activeTab);
+    }
     
     if (searchTerm) {
       const lowerCaseSearch = searchTerm.toLowerCase();
@@ -40,18 +78,25 @@ const ReceptorHome: React.FC = () => {
     }
     
     return tabFiltered;
-  }, [activeTab, removals, searchTerm]);
+  }, [activeTab, removals, searchTerm, deliveryFilter]);
 
   const handleDownload = () => {
     exportToExcel(filteredRemovals, `historico_receptor_${activeTab}`);
   };
 
-  const tabs: { id: RemovalStatus; label: string }[] = [
+  const tabs: { id: RemovalStatus | 'agenda_entrega'; label: string }[] = [
     { id: 'solicitada', label: 'Remoções Recebidas' },
     { id: 'em_andamento', label: 'Remoções Direcionadas' },
     { id: 'a_caminho', label: 'Em Andamento' },
     { id: 'concluida', label: 'Remoções Concluídas' },
     { id: 'cancelada', label: 'Remoções Canceladas' },
+    { id: 'agenda_entrega', label: 'Agenda de Entrega' },
+  ];
+
+  const deliveryFilters = [
+    { id: 'todos' as const, label: 'Todos' },
+    { id: 'aguardando_retirada' as const, label: 'Aguardando Retirada', icon: UserCheck },
+    { id: 'entrega_agendada' as const, label: 'Entrega Agendada', icon: CalendarClock },
   ];
 
   return (
@@ -103,7 +148,44 @@ const ReceptorHome: React.FC = () => {
           </nav>
         </div>
         <div className="p-6">
-          {filteredRemovals.length > 0 ? (
+          {activeTab === 'agenda_entrega' ? (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-semibold text-gray-600 mr-2">Filtrar por status:</span>
+                    {deliveryFilters.map(filter => (
+                        <button 
+                            key={filter.id}
+                            onClick={() => setDeliveryFilter(filter.id)} 
+                            className={`px-3 py-1 text-xs rounded-full transition-colors flex items-center gap-1.5 ${deliveryFilter === filter.id ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                        >
+                            {filter.icon && <filter.icon size={12} />}
+                            {filter.label}
+                        </button>
+                    ))}
+                </div>
+                <button
+                  onClick={() => setIsScheduleDeliveryModalOpen(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Agendar Entrega/Retirada
+                </button>
+              </div>
+              {deliveryFilter === 'entrega_agendada' ? (
+                <DeliveryCalendarView removals={filteredRemovals} onCancelDelivery={handleCancelDelivery} />
+              ) : (
+                filteredRemovals.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />)}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 py-12">Nenhuma remoção encontrada para este filtro.</p>
+                )
+              )}
+            </div>
+          ) : filteredRemovals.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />)}
             </div>
@@ -116,6 +198,10 @@ const ReceptorHome: React.FC = () => {
       <RequestTypeModal 
         isOpen={isRequestModalOpen} 
         onClose={() => setIsRequestModalOpen(false)} 
+      />
+      <ScheduleDeliveryModal 
+        isOpen={isScheduleDeliveryModalOpen} 
+        onClose={() => setIsScheduleDeliveryModalOpen(false)} 
       />
     </Layout>
   );

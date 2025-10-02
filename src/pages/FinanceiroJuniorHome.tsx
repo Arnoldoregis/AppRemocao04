@@ -4,14 +4,16 @@ import { useRemovals } from '../context/RemovalContext';
 import { useAgenda } from '../context/AgendaContext';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
-import { CalendarDays, Download, Search, Filter, PackageCheck } from 'lucide-react';
+import { CalendarDays, Download, Search, Filter, PackageCheck, Truck, Plus, UserCheck, CalendarClock } from 'lucide-react';
 import { Removal } from '../types';
 import RemovalCard from '../components/RemovalCard';
 import RemovalDetailsModal from '../components/RemovalDetailsModal';
 import { exportToExcel } from '../utils/exportToExcel';
+import ScheduleDeliveryModal from '../components/modals/ScheduleDeliveryModal';
+import DeliveryCalendarView from '../components/shared/DeliveryCalendarView';
 
 const FinanceiroJuniorHome: React.FC = () => {
-  const { removals } = useRemovals();
+  const { removals, updateRemoval } = useRemovals();
   const { schedule } = useAgenda();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -19,6 +21,8 @@ const FinanceiroJuniorHome: React.FC = () => {
   const [selectedRemoval, setSelectedRemoval] = useState<Removal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<'todos' | 'convencional' | 'faturado'>('todos');
+  const [deliveryFilter, setDeliveryFilter] = useState<'todos' | 'aguardando_retirada' | 'entrega_agendada'>('todos');
+  const [isScheduleDeliveryModalOpen, setIsScheduleDeliveryModalOpen] = useState(false);
 
   useEffect(() => {
     if (selectedRemoval) {
@@ -31,7 +35,27 @@ const FinanceiroJuniorHome: React.FC = () => {
 
   useEffect(() => {
     setPaymentFilter('todos');
+    setDeliveryFilter('todos');
   }, [activeTab]);
+
+  const handleCancelDelivery = (removalCode: string) => {
+    if (!user) return;
+    const removalToUpdate = removals.find(r => r.code === removalCode);
+    if (!removalToUpdate) return;
+
+    updateRemoval(removalCode, {
+        status: 'pronto_para_entrega',
+        scheduledDeliveryDate: undefined,
+        history: [
+            ...removalToUpdate.history,
+            {
+                date: new Date().toISOString(),
+                action: `Agendamento de entrega cancelado por ${user.name.split(' ')[0]}.`,
+                user: user.name,
+            },
+        ],
+    });
+  };
 
   const filteredRemovals = useMemo(() => {
     if (!user) return [];
@@ -51,6 +75,12 @@ const FinanceiroJuniorHome: React.FC = () => {
         case 'pronto_para_entrega':
             baseFiltered = removals.filter(r => r.status === 'pronto_para_entrega' && r.assignedFinanceiroJunior?.id === user.id);
             break;
+        case 'agenda_entrega':
+            baseFiltered = removals.filter(r => (r.status === 'aguardando_retirada' || r.status === 'entrega_agendada') && r.assignedFinanceiroJunior?.id === user.id);
+            if (deliveryFilter !== 'todos') {
+                baseFiltered = baseFiltered.filter(r => r.status === deliveryFilter);
+            }
+            break;
         case 'finalizadas':
             baseFiltered = removals.filter(r => r.status === 'aguardando_baixa_master' && r.assignedFinanceiroJunior?.id === user.id);
             break;
@@ -59,7 +89,7 @@ const FinanceiroJuniorHome: React.FC = () => {
     }
 
     // Payment method sub-filtering
-    if (paymentFilter !== 'todos' && !['agendado_despedida', 'pronto_para_entrega'].includes(activeTab)) {
+    if (paymentFilter !== 'todos' && !['agendado_despedida', 'pronto_para_entrega', 'agenda_entrega'].includes(activeTab)) {
         if (paymentFilter === 'faturado') {
             baseFiltered = baseFiltered.filter(r => r.paymentMethod === 'faturado');
         } else { // 'convencional'
@@ -78,7 +108,7 @@ const FinanceiroJuniorHome: React.FC = () => {
     }
 
     return baseFiltered;
-  }, [activeTab, removals, searchTerm, schedule, paymentFilter, user]);
+  }, [activeTab, removals, searchTerm, schedule, paymentFilter, user, deliveryFilter]);
 
   const handleDownload = () => {
     exportToExcel(filteredRemovals, `historico_fin_junior_${activeTab}`);
@@ -89,6 +119,7 @@ const FinanceiroJuniorHome: React.FC = () => {
     { id: 'individuais', label: 'Individuais/Faturado' },
     { id: 'agendado_despedida', label: 'Agendado Despedida' },
     { id: 'pronto_para_entrega', label: 'Pronto p/ Entrega', icon: PackageCheck },
+    { id: 'agenda_entrega', label: 'Agenda de Entrega', icon: Truck },
     { id: 'finalizadas', label: 'Finalizadas' },
   ];
 
@@ -96,6 +127,12 @@ const FinanceiroJuniorHome: React.FC = () => {
     { id: 'todos' as const, label: 'Todos' },
     { id: 'convencional' as const, label: 'Pag. Convencional' },
     { id: 'faturado' as const, label: 'Pag. Faturado' },
+  ];
+
+  const deliveryFilters = [
+    { id: 'todos' as const, label: 'Todos' },
+    { id: 'aguardando_retirada' as const, label: 'Aguardando Retirada', icon: UserCheck },
+    { id: 'entrega_agendada' as const, label: 'Entrega Agendada', icon: CalendarClock },
   ];
 
   return (
@@ -157,7 +194,44 @@ const FinanceiroJuniorHome: React.FC = () => {
         )}
 
         <div className="p-6">
-          {filteredRemovals.length > 0 ? (
+          {activeTab === 'agenda_entrega' ? (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-semibold text-gray-600 mr-2">Filtrar por status:</span>
+                    {deliveryFilters.map(filter => (
+                        <button 
+                            key={filter.id}
+                            onClick={() => setDeliveryFilter(filter.id)} 
+                            className={`px-3 py-1 text-xs rounded-full transition-colors flex items-center gap-1.5 ${deliveryFilter === filter.id ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                        >
+                            {filter.icon && <filter.icon size={12} />}
+                            {filter.label}
+                        </button>
+                    ))}
+                </div>
+                <button
+                  onClick={() => setIsScheduleDeliveryModalOpen(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Agendar Entrega/Retirada
+                </button>
+              </div>
+              {deliveryFilter === 'entrega_agendada' ? (
+                <DeliveryCalendarView removals={filteredRemovals} onCancelDelivery={handleCancelDelivery} />
+              ) : (
+                filteredRemovals.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />)}
+                    </div>
+                ) : (
+                    <p className="text-center text-gray-500 py-12">Nenhuma entrega ou retirada agendada.</p>
+                )
+              )}
+            </div>
+          ) : filteredRemovals.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredRemovals.map(removal => <RemovalCard key={removal.code} removal={removal} onClick={() => setSelectedRemoval(removal)} />)}
             </div>
@@ -167,6 +241,10 @@ const FinanceiroJuniorHome: React.FC = () => {
         </div>
       </div>
       <RemovalDetailsModal removal={selectedRemoval} onClose={() => setSelectedRemoval(null)} />
+      <ScheduleDeliveryModal 
+        isOpen={isScheduleDeliveryModalOpen} 
+        onClose={() => setIsScheduleDeliveryModalOpen(false)} 
+      />
     </Layout>
   );
 };

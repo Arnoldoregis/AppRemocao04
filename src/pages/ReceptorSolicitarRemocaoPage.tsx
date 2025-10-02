@@ -121,43 +121,8 @@ const ReceptorSolicitarRemocaoPage: React.FC = () => {
                 const data = await response.json();
                 if (!data.erro) {
                     setFormData(prev => ({ ...prev, enderecoRua: data.logradouro, enderecoBairro: data.bairro, enderecoCidade: data.localidade, enderecoEstado: data.uf }));
-                } else {
-                    alert('CEP não encontrado.');
                 }
             } catch (error) { console.error('Erro ao buscar CEP:', error); }
-        }
-    };
-
-    const searchAddressByStreet = async () => {
-        const { enderecoEstado, enderecoCidade, enderecoRua } = formData;
-        if (!enderecoEstado || !enderecoCidade || !enderecoRua) {
-            alert('Para buscar pelo nome da rua, por favor, preencha os campos "UF", "Cidade" e "Rua" primeiro.');
-            return;
-        }
-    
-        try {
-            if (enderecoRua.trim().length < 3) {
-                alert('Por favor, digite pelo menos 3 caracteres do nome da rua.');
-                return;
-            }
-    
-            const response = await fetch(`https://viacep.com.br/ws/${encodeURIComponent(enderecoEstado)}/${encodeURIComponent(enderecoCidade)}/${encodeURIComponent(enderecoRua.trim())}/json/`);
-            const data = await response.json();
-    
-            if (data && data.length > 0) {
-                const firstResult = data[0];
-                setFormData(prev => ({
-                    ...prev,
-                    enderecoCep: firstResult.cep,
-                    enderecoBairro: firstResult.bairro,
-                    enderecoRua: firstResult.logradouro,
-                }));
-            } else {
-                alert('Nenhum endereço encontrado com os dados fornecidos. Verifique se a Cidade e o Estado (UF) estão corretos.');
-            }
-        } catch (error) {
-            console.error('Erro ao buscar endereço pela rua:', error);
-            alert('Ocorreu um erro ao tentar buscar o endereço.');
         }
     };
 
@@ -263,7 +228,7 @@ const ReceptorSolicitarRemocaoPage: React.FC = () => {
                                 <select name="petEspecie" value={formData.petEspecie} onChange={handleInputChange} required className="w-full px-3 py-2 border rounded-md"><option value="">Espécie</option><option value="cachorro">Cachorro</option><option value="gato">Gato</option><option value="roedor">Roedor</option><option value="passaro">Pássaro</option><option value="outros">Outros</option></select>
                                 <input name="petRaca" value={formData.petRaca} onChange={handleInputChange} placeholder="Raça" className="w-full px-3 py-2 border rounded-md" />
                                 <select name="petSexo" value={formData.petSexo} onChange={handleInputChange} required className="w-full px-3 py-2 border rounded-md"><option value="">Sexo</option><option value="macho">Macho</option><option value="femea">Fêmea</option></select>
-                                <select name="petPeso" value={formData.petPeso} onChange={handleInputChange} required className="w-full px-3 py-2 border rounded-md"><option value="">Peso</option>{Object.keys(priceTable).map(range => <option key={range} value={range}>{range.replace('kg', ' kg').replace('-', ' a ')}</option>)}</select>
+                                <select name="petPeso" value={formData.petPeso} onChange={handleInputChange} required className="w-full px-3 py-2 border rounded-md"><option value="">Peso</option><option value="0-5kg">Até 05kg</option><option value="6-10kg">06-10kg</option><option value="11-20kg">11-20kg</option><option value="21-40kg">21-40kg</option><option value="41-50kg">41-50kg</option><option value="51-60kg">51-60kg</option><option value="61-80kg">61-80kg</option></select>
                                 <input name="petCausaMorte" value={formData.petCausaMorte} onChange={handleInputChange} placeholder="Causa da morte" className="w-full px-3 py-2 border rounded-md" />
                             </div>
                         </div>
@@ -271,18 +236,8 @@ const ReceptorSolicitarRemocaoPage: React.FC = () => {
                         <div>
                             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center"><MapPin className="h-5 w-5 mr-2 text-red-600" />Endereço da Remoção *</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="relative">
-                                    <input type="text" name="enderecoCep" value={formData.enderecoCep} onChange={handleInputChange} placeholder="CEP" required className="w-full px-3 py-2 border rounded-md" />
-                                    <button type="button" onClick={searchCEP} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                        <Search className="h-5 w-5" />
-                                    </button>
-                                </div>
-                                <div className="md:col-span-2 relative">
-                                    <input type="text" name="enderecoRua" value={formData.enderecoRua} onChange={handleInputChange} placeholder="Rua" required className="w-full px-3 py-2 border rounded-md" />
-                                    <button type="button" onClick={searchAddressByStreet} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                        <Search className="h-5 w-5" />
-                                    </button>
-                                </div>
+                                <div className="relative"><input type="text" name="enderecoCep" value={formData.enderecoCep} onChange={handleInputChange} placeholder="CEP" required className="w-full px-3 py-2 border rounded-md" /><button type="button" onClick={searchCEP} className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"><Search className="h-5 w-5" /></button></div>
+                                <div className="md:col-span-2"><input type="text" name="enderecoRua" value={formData.enderecoRua} onChange={handleInputChange} placeholder="Rua" required className="w-full px-3 py-2 border rounded-md" /></div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                                 <input type="text" name="enderecoNumero" value={formData.enderecoNumero} onChange={handleInputChange} placeholder="Número" required className="w-full px-3 py-2 border rounded-md" />

@@ -45,6 +45,8 @@ export type RemovalStatus =
   | 'em_lote_cremacao'    // Adicionado a um lote de cremação, aguardando início
   | 'cremado'             // Cremador marcou como cremado -> Vai para Montar Sacola
   | 'pronto_para_entrega' // Sacola montada -> Vai para Fin. Jr. notificar
+  | 'aguardando_retirada' // Tutor virá buscar
+  | 'entrega_agendada'    // Entrega será agendada
   | 'aguardando_boleto'   // Status para a visão da clínica
   | 'coletivo_pago'
   | 'individual_pago'
@@ -117,6 +119,7 @@ export interface Removal {
       quantity?: number;
     };
   };
+  scheduledDeliveryDate?: string;
 }
 
 export interface Additional {
