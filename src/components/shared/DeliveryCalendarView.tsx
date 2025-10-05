@@ -23,7 +23,7 @@ const DeliveryCalendarView: React.FC<DeliveryCalendarViewProps> = ({ removals, o
     const deliveriesByDay = useMemo(() => {
         const map = new Map<string, Removal[]>();
         removals.forEach(removal => {
-            if (removal.scheduledDeliveryDate) {
+            if (removal.status === 'entrega_agendada' && removal.scheduledDeliveryDate) {
                 // FIX: Parse date string as local time to avoid timezone shift
                 const localDate = new Date(removal.scheduledDeliveryDate + 'T00:00:00');
                 const dateKey = format(localDate, 'yyyy-MM-dd');

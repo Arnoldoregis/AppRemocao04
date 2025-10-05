@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Removal } from '../types';
+import { Removal, Address } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useRemovals } from '../context/RemovalContext';
 import { usePricing } from '../context/PricingContext';
@@ -10,9 +10,10 @@ import FinanceiroMasterActions from './actions/FinanceiroMasterActions';
 import ClinicaActions from './actions/ClinicaActions';
 import OperacionalActions from './actions/OperacionalActions';
 import AguardandoRetiradaActions from './actions/AguardandoRetiradaActions';
-import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4, Flame, Building, Truck } from 'lucide-react';
+import { X, User, Dog, MapPin, DollarSign, FileText, Calendar, Clock, History, Info, MessageSquare, Download, Map, AlertCircle, CheckCircle, Edit, ThumbsUp, PawPrint, Clock4, Flame, Building, Truck, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { downloadFile } from '../utils/downloadFile';
+import SetRemovalCode from './shared/SetRemovalCode';
 
 interface RemovalDetailsModalProps {
   removal: Removal | null;
@@ -56,15 +57,12 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
       return null;
     }
 
-    // 1. Valor Solicitado é apenas o valor base da modalidade/peso informado inicialmente.
     const informedWeightKey = removal.pet.weight as keyof typeof priceTable;
     const informedBasePrice = priceTable[informedWeightKey]?.[removal.modality] || 0;
     const valorSolicitado = informedBasePrice;
 
-    // Valor dos adicionais iniciais (da solicitação original)
     const initialAdditionalsValue = removal.additionals?.reduce((sum, ad) => sum + ad.value * ad.quantity, 0) || 0;
 
-    // 2. Valor Divergente é a diferença entre o preço do peso real e o preço do peso informado.
     let valorDivergente = 0;
     if (removal.realWeight) {
       const correctWeightKey = getWeightKeyFromRealWeight(removal.realWeight);
@@ -74,14 +72,11 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
       }
     }
 
-    // 3. Valor Adicional agora agrupa os adicionais da solicitação e os adicionados pelo financeiro.
     const customAdditionalsValue = removal.customAdditionals?.reduce((sum, ad) => sum + ad.value, 0) || 0;
     const valorAdicional = customAdditionalsValue + initialAdditionalsValue;
     
-    // 4. Sub Total é o valor final atual da remoção.
     const subTotal = removal.value;
 
-    // Mostra o detalhamento apenas se houver diferença de peso ou se produtos foram adicionados pelo financeiro.
     if (valorDivergente !== 0 || customAdditionalsValue > 0) {
         return {
             valorSolicitado,
@@ -97,22 +92,26 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
 
   if (!removal) return null;
 
+  const canSetCode = !removal.code && user && ['receptor', 'motorista', 'financeiro_junior'].includes(user.role || '');
+
   const handleWhatsAppClick = (phone: string) => {
     const phoneNumber = phone.replace(/\D/g, '');
     window.open(`https://wa.me/55${phoneNumber}`, '_blank', 'noopener,noreferrer');
 
-    // Se o usuário for financeiro junior e a remoção não tiver sido marcada, atualize-a.
     if (user?.role === 'financeiro_junior' && removal && !removal.contactedByFinance) {
-      updateRemoval(removal.code, { contactedByFinance: true });
+      updateRemoval(removal.id, { contactedByFinance: true });
     }
   };
 
-  const handleGpsClick = (address: string) => {
-    const encodedAddress = encodeURIComponent(address);
+  const handleGpsClick = (address: Address) => {
+    const fullAddress = `${address.street}, ${address.number}, ${address.city}`;
+    const encodedAddress = encodeURIComponent(fullAddress);
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank', 'noopener,noreferrer');
   };
 
   const renderActions = () => {
+    if (canSetCode && user?.role !== 'receptor') return null;
+
     if (removal.status === 'aguardando_retirada' && (user?.role === 'receptor' || user?.role === 'financeiro_junior')) {
       return <AguardandoRetiradaActions removal={removal} onClose={onClose} />;
     }
@@ -151,11 +150,27 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col">
         <div className="sticky top-0 bg-white p-4 border-b flex justify-between items-center z-10">
-          <h2 className="text-xl font-bold text-gray-900">Detalhes da Remoção - {removal.code}</h2>
+          <h2 className="text-xl font-bold text-gray-900">Detalhes da Remoção - {removal.code || <span className="text-yellow-600">Código Pendente</span>}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
         </div>
 
         <div className="overflow-y-auto p-6">
+          {removal.isPriority && user?.role === 'motorista' && (
+            <div className="mb-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-800 rounded-r-lg">
+              <h3 className="font-bold text-lg flex items-center">
+                <AlertTriangle className="h-6 w-6 mr-3" />
+                ATENÇÃO: REMOÇÃO PRIORITÁRIA!
+              </h3>
+              {removal.priorityDeadline && (
+                <p className="mt-2 text-base">
+                  Chegar ao local até às <strong className="text-xl">{removal.priorityDeadline}</strong>.
+                </p>
+              )}
+            </div>
+          )}
+
+          {canSetCode && <SetRemovalCode removal={removal} />}
+
           <DetailSection title="Informações Gerais" icon={Info}>
             <DetailItem label="Status" value={removal.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} />
             <div className="flex items-center justify-between">
@@ -176,6 +191,14 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
             <DetailItem label="Data da Solicitação" value={format(new Date(removal.createdAt), 'dd/MM/yyyy HH:mm')} />
             <DetailItem label="Motorista Atribuído" value={removal.assignedDriver?.name} />
           </DetailSection>
+
+          {removal.clinicName && (
+            <DetailSection title="Dados da Clínica" icon={Building}>
+              <DetailItem label="Nome Fantasia" value={removal.clinicName} />
+              <DetailItem label="CNPJ" value={removal.clinicCnpj} />
+              <DetailItem label="Contato da Clínica" value={removal.clinicPhone} />
+            </DetailSection>
+          )}
 
           <DetailSection title="Dados do Tutor" icon={User}>
             <DetailItem label="Nome" value={removal.tutor.name} />
@@ -231,7 +254,7 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
                 <p><strong>Endereço:</strong> {`${removal.removalAddress.street}, ${removal.removalAddress.number} - ${removal.removalAddress.neighborhood}, ${removal.removalAddress.city} - ${removal.removalAddress.state}`}</p>
                 {user?.role === 'motorista' && (
                     <button
-                        onClick={() => handleGpsClick(`${removal.removalAddress.street}, ${removal.removalAddress.number}, ${removal.removalAddress.city}`)}
+                        onClick={() => handleGpsClick(removal.removalAddress)}
                         className="flex-shrink-0 ml-4 flex items-center gap-2 px-3 py-1 bg-blue-500 text-white text-xs font-semibold rounded-full hover:bg-blue-600 transition-colors"
                     >
                         <Map size={14} />
@@ -387,9 +410,17 @@ const RemovalDetailsModal: React.FC<RemovalDetailsModalProps> = ({ removal, onCl
                     <p className="font-semibold text-orange-600">O tutor virá buscar na unidade.</p>
                 )}
                 {removal.status === 'entrega_agendada' && removal.scheduledDeliveryDate && (
-                    <p className="font-semibold text-cyan-600">
-                        Entrega agendada para: {format(new Date(removal.scheduledDeliveryDate), 'dd/MM/yyyy')}
-                    </p>
+                    <>
+                        <p className="font-semibold text-cyan-600">
+                            Entrega agendada para: {format(new Date(removal.scheduledDeliveryDate + 'T00:00:00'), 'dd/MM/yyyy')}
+                        </p>
+                        <DetailItem 
+                            label="Endereço de Entrega" 
+                            value={
+                                `${(removal.deliveryAddress || removal.removalAddress).street}, ${(removal.deliveryAddress || removal.removalAddress).number} - ${(removal.deliveryAddress || removal.removalAddress).neighborhood}, ${(removal.deliveryAddress || removal.removalAddress).city}`
+                            } 
+                        />
+                    </>
                 )}
             </DetailSection>
           )}

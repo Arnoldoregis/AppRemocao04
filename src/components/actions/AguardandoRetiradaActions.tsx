@@ -17,7 +17,7 @@ const AguardandoRetiradaActions: React.FC<AguardandoRetiradaActionsProps> = ({ r
   const handleConfirmPickup = () => {
     if (!user) return;
 
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
       status: 'finalizada',
       history: [
         ...removal.history,

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Removal } from '../../types';
 import { useRemovals } from '../../context/RemovalContext';
 import { useAuth } from '../../context/AuthContext';
-import { Edit, Save, Send, X, Flame, CheckCircle } from 'lucide-react';
+import { Edit, Save, Send, X, Flame, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface OperacionalActionsProps {
     removal: Removal;
@@ -23,7 +23,7 @@ const OperacionalActions: React.FC<OperacionalActionsProps> = ({ removal, onClos
     const [additionalConfirmation, setAdditionalConfirmation] = useState<Record<string, 'sim' | 'nao'>>({});
 
     const uniqueAdditionals = useMemo(() => {
-        const allAdditionals: { name: string, quantity: number }[] = [
+        const allAdditionals: { name: string; quantity: number }[] = [
             ...(removal.additionals || []).map(ad => ({ name: ad.type.replace(/_/g, ' '), quantity: ad.quantity })),
             ...(removal.customAdditionals || []).map(ad => ({ name: ad.name, quantity: 1 }))
         ];
@@ -66,7 +66,7 @@ const OperacionalActions: React.FC<OperacionalActionsProps> = ({ removal, onClos
             user: user.name,
         };
 
-        updateRemoval(removal.code, {
+        updateRemoval(removal.id, {
             status: 'finalizada',
             history: [...removal.history, historyEntry],
         });
@@ -78,7 +78,7 @@ const OperacionalActions: React.FC<OperacionalActionsProps> = ({ removal, onClos
     const handleSave = () => {
         if (!user || !user.name) return;
         const userName = user.name.split(' ')[0];
-        updateRemoval(removal.code, {
+        updateRemoval(removal.id, {
             petCondition,
             farewellSchedulingInfo: farewellInfo,
             history: [
@@ -92,8 +92,11 @@ const OperacionalActions: React.FC<OperacionalActionsProps> = ({ removal, onClos
     const handleForwardToFinance = () => {
         if (!user || !user.name) return;
         const userName = user.name.split(' ')[0];
-        updateRemoval(removal.code, {
+        const financeiroJuniorUser = { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' };
+
+        updateRemoval(removal.id, {
             status: 'aguardando_financeiro_junior',
+            assignedFinanceiroJunior: financeiroJuniorUser,
             history: [
                 ...removal.history,
                 { date: new Date().toISOString(), action: `Encaminhado para o Financeiro Junior por ${userName}`, user: user.name }
@@ -105,7 +108,7 @@ const OperacionalActions: React.FC<OperacionalActionsProps> = ({ removal, onClos
     const handleReleaseForCremation = () => {
         if (!user || !user.name) return;
         const userName = user.name.split(' ')[0];
-        updateRemoval(removal.code, {
+        updateRemoval(removal.id, {
             status: 'finalizada',
             history: [
                 ...removal.history,
@@ -125,7 +128,7 @@ const OperacionalActions: React.FC<OperacionalActionsProps> = ({ removal, onClos
             alert('Empresa de cremação não definida. Não é possível marcar como cremado.');
             return;
         }
-        updateRemoval(removal.code, {
+        updateRemoval(removal.id, {
             status: 'cremado',
             history: [
                 ...removal.history,
@@ -142,6 +145,7 @@ const OperacionalActions: React.FC<OperacionalActionsProps> = ({ removal, onClos
     // JSX Logic
     if (removal.status === 'concluida') {
         const isIndividual = removal.modality.includes('individual');
+        const isForwardDisabled = isIndividual && !removal.farewellSchedulingInfo;
 
         if (isEditing && isIndividual) {
             return (
@@ -193,9 +197,22 @@ const OperacionalActions: React.FC<OperacionalActionsProps> = ({ removal, onClos
                         <Edit size={16} /> Editar Infos de Despedida
                     </button>
                 )}
-                <button onClick={handleForwardToFinance} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2">
-                    <Send size={16} /> Encaminhar para Financeiro
-                </button>
+                <div className="relative group">
+                    <button 
+                        onClick={handleForwardToFinance} 
+                        disabled={isForwardDisabled}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Send size={16} /> Encaminhar para Financeiro
+                    </button>
+                    {isForwardDisabled && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            <AlertTriangle className="inline h-4 w-4 mr-1.5" />
+                            É necessário definir as informações de despedida antes de encaminhar.
+                            <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
+                        </div>
+                    )}
+                </div>
             </div>
         );
     }

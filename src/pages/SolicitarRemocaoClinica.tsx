@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useRemovals } from '../context/RemovalContext';
+import { usePricing } from '../context/PricingContext';
 import Layout from '../components/Layout';
 import { ArrowLeft, Upload, Plus, Minus, Building2, MapPin } from 'lucide-react';
-import { Additional, Removal } from '../types';
-import { priceTable, adicionaisDisponiveis } from '../data/pricing';
+import { Additional, Removal, Address } from '../types';
+import { adicionaisDisponiveis } from '../data/pricing';
+import { getRegionFromAddress, getSpeciesType, getBillingType } from '../utils/pricingUtils';
 
 const SolicitarRemocaoClinica: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { generateRemovalCode, addRemoval } = useRemovals();
+  const { addRemoval } = useRemovals();
+  const { priceTable } = usePricing();
 
   const [formData, setFormData] = useState({
     modalidade: '' as Removal['modality'],
@@ -36,6 +39,7 @@ const SolicitarRemocaoClinica: React.FC = () => {
   
   const [adicionais, setAdicionais] = useState<Additional[]>([]);
   const [valorTotal, setValorTotal] = useState(0);
+  const [priceBreakdown, setPriceBreakdown] = useState({ base: 0, extras: 0, discount: 0 });
   const [showUpload, setShowUpload] = useState(false);
   const [showContrato, setShowContrato] = useState(false);
   const [showPagamentoInfo, setShowPagamentoInfo] = useState(false);
@@ -53,26 +57,48 @@ const SolicitarRemocaoClinica: React.FC = () => {
 
   useEffect(() => {
     const calcularValorTotal = () => {
-      let valorBase = 0;
-      if (formData.petPeso && formData.modalidade) {
-        const pesoKey = formData.petPeso as keyof typeof priceTable;
-        if (priceTable[pesoKey]?.[formData.modalidade]) {
-          valorBase = priceTable[pesoKey][formData.modalidade];
-        }
+      const canCalculate = 
+          formData.modalidade &&
+          formData.petEspecie &&
+          formData.petPeso &&
+          user?.address?.city &&
+          user?.address?.state &&
+          formData.formaPagamento;
+
+      if (!canCalculate) {
+          setValorTotal(0);
+          setPriceBreakdown({ base: 0, extras: 0, discount: 0 });
+          return;
       }
+
+      let valorBase = 0;
+      const pesoKey = formData.petPeso;
+      const modKey = formData.modalidade;
+
+      const region = getRegionFromAddress(user!.address!);
+      const speciesType = getSpeciesType(formData.petEspecie);
+      const billingType = getBillingType(formData.formaPagamento);
+      
+      if (priceTable[region]?.[speciesType]?.[billingType]?.[pesoKey]?.[modKey]) {
+        valorBase = priceTable[region][speciesType][billingType][pesoKey][modKey];
+      }
+      
       const valorAdicionais = adicionais.reduce((total, ad) => total + (ad.value * ad.quantity), 0);
       
       let finalTotal = valorBase + valorAdicionais;
+      let patinhaDiscount = 0;
 
       if (formData.modalidade === 'individual_ouro' && adicionais.some(ad => ad.type === 'patinha_resina' && ad.quantity > 0)) {
           const patinhaPrice = adicionaisDisponiveis.find(ad => ad.type === 'patinha_resina')?.value || 0;
+          patinhaDiscount = patinhaPrice;
           finalTotal -= patinhaPrice;
       }
 
       setValorTotal(finalTotal);
+      setPriceBreakdown({ base: valorBase, extras: valorAdicionais, discount: patinhaDiscount });
     };
     calcularValorTotal();
-  }, [formData.petPeso, formData.modalidade, adicionais]);
+  }, [formData.modalidade, formData.petEspecie, formData.petPeso, formData.formaPagamento, adicionais, user?.address, priceTable]);
   
   useEffect(() => {
     const needsUpload = formData.formaPagamento === 'pix' || formData.formaPagamento === 'link_pagamento';
@@ -107,15 +133,15 @@ const SolicitarRemocaoClinica: React.FC = () => {
     e.preventDefault();
     if (!user) return;
     
-    const removalCode = generateRemovalCode();
-    const newRemoval: Removal = {
-      code: removalCode,
+    const newRemoval: Partial<Removal> = {
       createdById: user.id,
       clinicName: user.name,
+      clinicCnpj: user.cnpj,
+      clinicPhone: user.phone,
       modality: formData.modalidade,
       tutor: { cpfOrCnpj: formData.tutorCpfCnpj, name: formData.tutorNome, phone: formData.tutorContato, email: formData.tutorEmail },
       pet: { name: formData.petNome, species: formData.petEspecie, breed: formData.petRaca, gender: formData.petSexo, weight: formData.petPeso, causeOfDeath: formData.petCausaMorte },
-      removalAddress: { ...(user.address), street: formData.enderecoRemocao },
+      removalAddress: { ...(user.address as Address), street: formData.enderecoRemocao },
       additionals: adicionais,
       paymentMethod: formData.formaPagamento,
       value: valorTotal,
@@ -128,11 +154,10 @@ const SolicitarRemocaoClinica: React.FC = () => {
       history: [{ date: new Date().toISOString(), action: 'Solicitação criada', user: user.name }],
       contractNumber: formData.contratoNumero,
       paymentProof: paymentProofFile ? paymentProofFile.name : undefined,
-      createdAt: new Date().toISOString(),
     };
 
     addRemoval(newRemoval);
-    alert(`Solicitação de remoção ${removalCode} criada com sucesso!`);
+    alert(`Solicitação de remoção criada com sucesso!`);
     navigate('/clinica');
   };
 
@@ -349,7 +374,26 @@ const SolicitarRemocaoClinica: React.FC = () => {
             </div>
 
             {/* Valor Total */}
-            <div className="bg-gray-50 p-4 rounded-lg text-lg font-semibold">Valor Total: <span className="text-green-600">R$ {valorTotal.toFixed(2)}</span></div>
+            <div className="bg-gray-50 p-4 rounded-lg space-y-2 border border-gray-200">
+                <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-gray-800">Valor Total:</span>
+                    {valorTotal > 0 || (priceBreakdown.base === 0 && priceBreakdown.extras > 0) ? (
+                        <span className="text-2xl font-bold text-green-600">R$ {valorTotal.toFixed(2)}</span>
+                    ) : (
+                        <span className="text-sm text-gray-500">Preencha os campos para calcular</span>
+                    )}
+                </div>
+                {valorTotal > 0 && (
+                    <details className="text-xs">
+                        <summary className="text-blue-600 cursor-pointer select-none font-medium">Ver detalhes do cálculo</summary>
+                        <div className="text-sm text-gray-600 mt-2 space-y-1 border-t pt-2">
+                            {priceBreakdown.base > 0 && <div className="flex justify-between"><span>Valor Base (Modalidade/Peso/Região):</span><span>R$ {priceBreakdown.base.toFixed(2)}</span></div>}
+                            {priceBreakdown.extras > 0 && <div className="flex justify-between"><span>Adicionais:</span><span>+ R$ {priceBreakdown.extras.toFixed(2)}</span></div>}
+                            {priceBreakdown.discount > 0 && <div className="flex justify-between text-red-600"><span>Desconto (Patinha Inclusa):</span><span>- R$ {priceBreakdown.discount.toFixed(2)}</span></div>}
+                        </div>
+                    </details>
+                )}
+            </div>
 
             <div className="flex justify-end space-x-4 pt-6">
               <button type="button" onClick={() => navigate('/clinica')} className="px-6 py-2 border rounded-md">Cancelar</button>

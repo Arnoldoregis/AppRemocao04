@@ -55,9 +55,12 @@ export type RemovalStatus =
 
 
 export interface Removal {
+  id: string;
   code: string;
   createdById: string; // ID do usuário (PF ou Clínica) que criou
   clinicName?: string; // Nome da clínica, se aplicável
+  clinicCnpj?: string;
+  clinicPhone?: string;
   modality: 'coletivo' | 'individual_prata' | 'individual_ouro' | '';
   tutor: {
     cpfOrCnpj: string;
@@ -67,6 +70,7 @@ export interface Removal {
   };
   pet: Pet;
   removalAddress: Address;
+  deliveryAddress?: Address;
   additionals: Additional[];
   customAdditionals?: CustomAdditional[];
   paymentMethod: 'faturado' | 'debito' | 'credito' | 'pix' | 'link_pagamento' | 'dinheiro' | 'plano_preventivo' | '';
@@ -120,6 +124,8 @@ export interface Removal {
     };
   };
   scheduledDeliveryDate?: string;
+  isPriority?: boolean;
+  priorityDeadline?: string;
 }
 
 export interface Additional {
@@ -209,3 +215,7 @@ export interface StockItem {
   createdAt: string;
   minAlertQuantity?: number;
 }
+
+export type PriceRegion = 'curitiba_rm' | 'litoral' | 'sc';
+export type PetSpeciesType = 'normal' | 'exotico';
+export type BillingType = 'faturado' | 'nao_faturado';

@@ -18,7 +18,8 @@ const MotoristaActions: React.FC<MotoristaActionsProps> = ({ removal, onClose })
 
   const handleUpdateStatus = (newStatus: Removal['status'], actionText: string) => {
     if (!user) return;
-    updateRemoval(removal.code, {
+
+    const updates: Partial<Removal> = {
       status: newStatus,
       history: [
         ...removal.history,
@@ -28,13 +29,20 @@ const MotoristaActions: React.FC<MotoristaActionsProps> = ({ removal, onClose })
           user: user.name,
         },
       ],
-    });
+    };
+
+    if (newStatus === 'removido') {
+      updates.isPriority = false;
+      updates.priorityDeadline = undefined;
+    }
+
+    updateRemoval(removal.id, updates);
     onClose();
   };
 
   const handleFinalize = () => {
     if (!user || !realWeight) return;
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
       status: 'concluida',
       realWeight: parseFloat(realWeight),
       history: [

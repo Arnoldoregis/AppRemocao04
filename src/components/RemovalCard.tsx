@@ -1,7 +1,7 @@
 import React from 'react';
 import { Removal, RemovalStatus } from '../types';
 import { format } from 'date-fns';
-import { List, Clock, CheckCircle, FileWarning, FileCheck, XCircle, Files, Eye, Send, Flame, PackageCheck, UserCheck, CalendarClock } from 'lucide-react';
+import { List, Clock, CheckCircle, FileWarning, FileCheck, XCircle, Files, Eye, Send, Flame, PackageCheck, UserCheck, CalendarClock, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface RemovalCardProps {
@@ -47,21 +47,34 @@ const RemovalCard: React.FC<RemovalCardProps> = ({ removal, onClick }) => {
   const displayColor = isContactedByFinance ? 'green' : statusStyle.color;
 
   const modalityStyle = modalityConfig[removal.modality] || modalityConfig[''];
+  
+  const cardClasses = [
+    "bg-white rounded-lg shadow-md p-4 transition-all hover:shadow-lg cursor-pointer border-l-8",
+    removal.isPriority ? "border-red-500" : "border-transparent"
+  ].join(" ");
 
   return (
     <div 
-      className="bg-white rounded-lg shadow-md p-4 transition-all hover:shadow-lg cursor-pointer"
+      className={cardClasses}
       onClick={onClick}
     >
       <div className="flex justify-between items-start">
         <div>
           <p className="font-bold text-gray-900">{removal.pet.name}</p>
           <p className="text-sm text-gray-600">Tutor: {removal.tutor.name}</p>
-          <p className="text-xs text-gray-400">Código: {removal.code}</p>
+          <p className="text-xs text-gray-400">Código: {removal.code || <span className="text-yellow-600 font-semibold">Pendente</span>}</p>
         </div>
-        <div className={`flex items-center text-sm font-medium text-${displayColor}-600 bg-${displayColor}-100 px-2 py-1 rounded-full`}>
-          <StatusIcon className="h-4 w-4 mr-1" />
-          {statusStyle.label}
+        <div className="flex flex-col items-end gap-2">
+            {removal.isPriority && (
+                <div className="flex items-center text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full animate-pulse">
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    PRIORIDADE
+                </div>
+            )}
+            <div className={`flex items-center text-sm font-medium text-${displayColor}-600 bg-${displayColor}-100 px-2 py-1 rounded-full`}>
+              <StatusIcon className="h-4 w-4 mr-1" />
+              {statusStyle.label}
+            </div>
         </div>
       </div>
       <div className="mt-4 text-sm space-y-2">

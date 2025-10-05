@@ -106,7 +106,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     }
     const isScheduled = Object.values(schedule).some(scheduledRemoval => scheduledRemoval.code === removal.code);
     const farewellText = isScheduled ? `com despedida agendada` : `sem despedida agendada`;
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
       status: 'aguardando_baixa_master',
       history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} finalizou e enviou para o Financeiro Master (${removal.cremationCompany}) ${farewellText}`, user: user.name }],
     });
@@ -115,7 +115,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
   const handleFinalizeDeliveryForMaster = () => {
     if (!user) return;
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
         status: 'aguardando_baixa_master',
         history: [
             ...removal.history,
@@ -131,7 +131,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
   const handleReturnToOperational = () => {
     if (!user) return;
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
       status: 'aguardando_baixa_master',
       history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} retornou a remoção para o Operacional.`, user: user.name }],
     });
@@ -140,7 +140,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
   const handleSendToRelease = () => {
     if (!user) return;
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
       status: 'aguardando_baixa_master',
       history: [
         ...removal.history,
@@ -227,7 +227,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     }
     if (historyActions.length > 0) {
         const diff = processedItems.reduce((acc, item) => acc + item.value, 0) - originalItems.reduce((acc, item) => acc + item.value, 0);
-        updateRemoval(removal.code, {
+        updateRemoval(removal.id, {
             customAdditionals: processedItems, value: removal.value + diff,
             history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${historyActions.join(' e ')}.`, user: user.name }],
         });
@@ -239,7 +239,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     if (!user || !adjustmentValue) return;
     const value = parseFloat(adjustmentValue);
     const actionText = adjustmentType === 'receber' ? `recebeu um valor de R$ ${value.toFixed(2)}` : `devolveu um valor de R$ ${value.toFixed(2)}`;
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
       value: adjustmentType === 'receber' ? removal.value + value : removal.value - value,
       adjustmentConfirmed: true,
       history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionText}.`, user: user.name, proofUrl: adjustmentProof ? adjustmentProof.name : undefined }],
@@ -250,7 +250,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
   const handleSaveModality = () => {
     if (!user || modalityDifference === 0) return;
     const actionText = `alterou a modalidade de ${removal.modality.replace(/_/g, ' ')} para ${newModality.replace(/_/g, ' ')}, com um ajuste de R$ ${modalityDifference.toFixed(2)}`;
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
       modality: newModality, value: removal.value + modalityDifference,
       history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionText}.`, user: user.name, proofUrl: modalityProof ? modalityProof.name : undefined }],
     });
@@ -271,7 +271,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     }
     if (obsChanged) actionParts.push(certificateObs ? `adicionou a observação ao certificado: "${certificateObs}"` : `removeu as observações do certificado`);
     if (actionParts.join(' e ')) {
-        updateRemoval(removal.code, {
+        updateRemoval(removal.id, {
             cremationCompany, cremationDate, certificateObservations: certificateObs,
             history: [...removal.history, { date: new Date().toISOString(), action: `Financeiro Junior ${user.name.split(' ')[0]} ${actionParts.join(' e ')}.`, user: user.name }],
         });
@@ -293,7 +293,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
 
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
 
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
         history: [
             ...removal.history,
             {
@@ -331,7 +331,7 @@ const FinanceiroJuniorActions: React.FC<FinanceiroJuniorActionsProps> = ({
     }
 
     if (historyActions.length > 0) {
-        updateRemoval(removal.code, {
+        updateRemoval(removal.id, {
           ...updates,
           history: [
             ...removal.history,

@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
 import { usePricing } from '../../context/PricingContext';
-import { X } from 'lucide-react';
+import { X, MapPin, Waves, Map as MapIcon, Dog, Rabbit, CreditCard, FileText } from 'lucide-react';
+import { PriceRegion, PetSpeciesType, BillingType } from '../../types';
+
+const regionConfig: { id: PriceRegion; label: string; icon: React.ElementType }[] = [
+    { id: 'curitiba_rm', label: 'Curitiba/RM', icon: MapPin },
+    { id: 'litoral', label: 'Litoral', icon: Waves },
+    { id: 'sc', label: 'SC', icon: MapIcon },
+];
+
+const speciesConfig: { id: PetSpeciesType; label: string; icon: React.ElementType }[] = [
+    { id: 'normal', label: 'Não Exótico', icon: Dog },
+    { id: 'exotico', label: 'Exótico', icon: Rabbit },
+];
+
+const billingConfig: { id: BillingType; label: string; icon: React.ElementType }[] = [
+    { id: 'nao_faturado', label: 'Não Faturado', icon: CreditCard },
+    { id: 'faturado', label: 'Faturado', icon: FileText },
+];
 
 interface AddWeightRangeModalProps {
     isOpen: boolean;
@@ -9,6 +26,9 @@ interface AddWeightRangeModalProps {
 
 const AddWeightRangeModal: React.FC<AddWeightRangeModalProps> = ({ isOpen, onClose }) => {
     const { modalities, addWeightRange } = usePricing();
+    const [region, setRegion] = useState<PriceRegion>('curitiba_rm');
+    const [speciesType, setSpeciesType] = useState<PetSpeciesType>('normal');
+    const [billingType, setBillingType] = useState<BillingType>('nao_faturado');
     const [range, setRange] = useState('');
     const [prices, setPrices] = useState<Record<string, string>>({});
     const [error, setError] = useState('');
@@ -41,7 +61,7 @@ const AddWeightRangeModal: React.FC<AddWeightRangeModalProps> = ({ isOpen, onClo
             return;
         }
 
-        addWeightRange(range, finalPrices);
+        addWeightRange(region, speciesType, billingType, range, finalPrices);
         onClose();
     };
 
@@ -55,7 +75,38 @@ const AddWeightRangeModal: React.FC<AddWeightRangeModalProps> = ({ isOpen, onClo
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
                 </div>
                 <form onSubmit={handleSubmit}>
-                    <div className="p-6 space-y-4">
+                    <div className="p-6 space-y-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Região</label>
+                            <div className="flex flex-wrap gap-2">
+                                {regionConfig.map(r => (
+                                    <button key={r.id} type="button" onClick={() => setRegion(r.id)} className={`px-4 py-2 text-sm font-medium flex items-center gap-2 rounded-lg border-2 ${region === r.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                                        <r.icon size={16} /> {r.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Espécie</label>
+                            <div className="flex flex-wrap gap-2">
+                                {speciesConfig.map(s => (
+                                    <button key={s.id} type="button" onClick={() => setSpeciesType(s.id)} className={`px-4 py-2 text-sm font-medium flex items-center gap-2 rounded-lg border-2 ${speciesType === s.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                                        <s.icon size={16} /> {s.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Faturamento</label>
+                            <div className="flex flex-wrap gap-2">
+                                {billingConfig.map(b => (
+                                    <button key={b.id} type="button" onClick={() => setBillingType(b.id)} className={`px-4 py-2 text-sm font-medium flex items-center gap-2 rounded-lg border-2 ${billingType === b.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                                        <b.icon size={16} /> {b.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <hr/>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Faixa de Peso (ex: 81-100kg)</label>
                             <input type="text" value={range} onChange={e => setRange(e.target.value)} required className="w-full px-3 py-2 border rounded-md" />

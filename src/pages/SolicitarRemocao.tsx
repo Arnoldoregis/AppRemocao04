@@ -5,13 +5,14 @@ import { useRemovals } from '../context/RemovalContext';
 import { usePricing } from '../context/PricingContext';
 import Layout from '../components/Layout';
 import { ArrowLeft, Upload, Plus, Minus, MapPin } from 'lucide-react';
-import { Additional, Removal } from '../types';
+import { Additional, Removal, Address } from '../types';
 import { adicionaisDisponiveis } from '../data/pricing';
+import { getRegionFromAddress, getSpeciesType, getBillingType } from '../utils/pricingUtils';
 
 const SolicitarRemocao: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { generateRemovalCode, addRemoval } = useRemovals();
+  const { addRemoval } = useRemovals();
   const { priceTable, modalities } = usePricing();
   
   const activeModalities = modalities.filter(m => m.active);
@@ -40,6 +41,7 @@ const SolicitarRemocao: React.FC = () => {
 
   const [adicionais, setAdicionais] = useState<Additional[]>([]);
   const [valorTotal, setValorTotal] = useState(0);
+  const [priceBreakdown, setPriceBreakdown] = useState({ base: 0, extras: 0, discount: 0 });
   const [showUpload, setShowUpload] = useState(false);
   const [showContrato, setShowContrato] = useState(false);
   const [showPagamentoInfo, setShowPagamentoInfo] = useState(false);
@@ -56,31 +58,51 @@ const SolicitarRemocao: React.FC = () => {
 
   useEffect(() => {
     const calcularValorTotal = () => {
-      let valorBase = 0;
-      if (formData.petPeso && formData.modalidade) {
-        const pesoKey = formData.petPeso as keyof typeof priceTable;
-        const modKey = formData.modalidade;
-        if (priceTable[pesoKey]?.[modKey]) {
-          valorBase = priceTable[pesoKey][modKey];
+        const canCalculate = 
+            formData.modalidade &&
+            formData.petEspecie &&
+            formData.petPeso &&
+            user?.address?.city &&
+            user?.address?.state &&
+            formData.formaPagamento;
+
+        if (!canCalculate) {
+            setValorTotal(0);
+            setPriceBreakdown({ base: 0, extras: 0, discount: 0 });
+            return;
         }
-      }
-  
-      const valorAdicionais = adicionais.reduce((total, adicional) => {
-        return total + (adicional.value * adicional.quantity);
-      }, 0);
-  
-      let finalTotal = valorBase + valorAdicionais;
 
-      if (formData.modalidade === 'individual_ouro' && adicionais.some(ad => ad.type === 'patinha_resina' && ad.quantity > 0)) {
-          const patinhaPrice = adicionaisDisponiveis.find(ad => ad.type === 'patinha_resina')?.value || 0;
-          finalTotal -= patinhaPrice;
-      }
+        let valorBase = 0;
+        const pesoKey = formData.petPeso;
+        const modKey = formData.modalidade;
+        
+        const region = getRegionFromAddress(user!.address!);
+        const speciesType = getSpeciesType(formData.petEspecie);
+        const billingType = getBillingType(formData.formaPagamento);
 
-      setValorTotal(finalTotal);
+        if (priceTable[region]?.[speciesType]?.[billingType]?.[pesoKey]?.[modKey]) {
+            valorBase = priceTable[region][speciesType][billingType][pesoKey][modKey];
+        }
+      
+        const valorAdicionais = adicionais.reduce((total, adicional) => {
+            return total + (adicional.value * adicional.quantity);
+        }, 0);
+    
+        let finalTotal = valorBase + valorAdicionais;
+        let patinhaDiscount = 0;
+
+        if (formData.modalidade === 'individual_ouro' && adicionais.some(ad => ad.type === 'patinha_resina' && ad.quantity > 0)) {
+            const patinhaPrice = adicionaisDisponiveis.find(ad => ad.type === 'patinha_resina')?.value || 0;
+            patinhaDiscount = patinhaPrice;
+            finalTotal -= patinhaPrice;
+        }
+
+        setValorTotal(finalTotal);
+        setPriceBreakdown({ base: valorBase, extras: valorAdicionais, discount: patinhaDiscount });
     };
 
     calcularValorTotal();
-  }, [formData.petPeso, formData.modalidade, adicionais, priceTable]);
+  }, [formData.modalidade, formData.petEspecie, formData.petPeso, formData.formaPagamento, adicionais, priceTable, user?.address]);
 
   useEffect(() => {
     const needsUpload = formData.formaPagamento === 'pix' || formData.formaPagamento === 'link_pagamento';
@@ -125,10 +147,7 @@ const SolicitarRemocao: React.FC = () => {
     e.preventDefault();
     if (!user) return;
     
-    const removalCode = generateRemovalCode();
-    
-    const removal: Removal = {
-      code: removalCode,
+    const removalData: Partial<Removal> = {
       createdById: user.id,
       modality: formData.modalidade,
       tutor: {
@@ -145,7 +164,7 @@ const SolicitarRemocao: React.FC = () => {
         weight: formData.petPeso,
         causeOfDeath: formData.petCausaMorte
       },
-      removalAddress: user?.address || {} as any,
+      removalAddress: user?.address || {} as Address,
       additionals: adicionais,
       paymentMethod: formData.formaPagamento,
       value: valorTotal,
@@ -162,11 +181,10 @@ const SolicitarRemocao: React.FC = () => {
       }],
       contractNumber: formData.contratoNumero,
       paymentProof: paymentProofFile ? paymentProofFile.name : undefined,
-      createdAt: new Date().toISOString(),
     };
 
-    addRemoval(removal);
-    alert(`Solicitação criada com sucesso! Código: ${removalCode}`);
+    addRemoval(removalData);
+    alert(`Solicitação criada com sucesso! Em breve um de nossos atendentes entrará em contato.`);
     navigate('/pessoa-fisica');
   };
 
@@ -479,10 +497,25 @@ const SolicitarRemocao: React.FC = () => {
             </div>
 
             {/* Valor Total */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-lg font-semibold text-gray-900">
-                Valor Total: <span className="text-green-600">R$ {valorTotal.toFixed(2)}</span>
-              </div>
+            <div className="bg-gray-50 p-4 rounded-lg space-y-2 border border-gray-200">
+                <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-gray-800">Valor Total:</span>
+                    {valorTotal > 0 || (priceBreakdown.base === 0 && priceBreakdown.extras > 0) ? (
+                        <span className="text-2xl font-bold text-green-600">R$ {valorTotal.toFixed(2)}</span>
+                    ) : (
+                        <span className="text-sm text-gray-500">Preencha os campos para calcular</span>
+                    )}
+                </div>
+                {valorTotal > 0 && (
+                    <details className="text-xs">
+                        <summary className="text-blue-600 cursor-pointer select-none font-medium">Ver detalhes do cálculo</summary>
+                        <div className="text-sm text-gray-600 mt-2 space-y-1 border-t pt-2">
+                            {priceBreakdown.base > 0 && <div className="flex justify-between"><span>Valor Base (Modalidade/Peso/Região):</span><span>R$ {priceBreakdown.base.toFixed(2)}</span></div>}
+                            {priceBreakdown.extras > 0 && <div className="flex justify-between"><span>Adicionais:</span><span>+ R$ {priceBreakdown.extras.toFixed(2)}</span></div>}
+                            {priceBreakdown.discount > 0 && <div className="flex justify-between text-red-600"><span>Desconto (Patinha Inclusa):</span><span>- R$ {priceBreakdown.discount.toFixed(2)}</span></div>}
+                        </div>
+                    </details>
+                )}
             </div>
 
             {/* Observações */}

@@ -17,7 +17,7 @@ const ClinicaActions: React.FC<ClinicaActionsProps> = ({ removal, onClose }) => 
     if (!user) return;
     const reason = prompt('Por favor, insira o motivo do cancelamento:');
     if (reason) {
-      updateRemoval(removal.code, {
+      updateRemoval(removal.id, {
         status: 'cancelada',
         cancellationReason: reason,
         history: [

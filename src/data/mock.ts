@@ -1,10 +1,18 @@
 import { faker } from '@faker-js/faker';
-import { Removal, RemovalStatus } from '../types';
+import { Removal, RemovalStatus, User } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 export const mockDrivers = [
   { id: 'motorista_1', name: 'Fernando', email: 'motorista@gmail.com', phone: '41984938295' },
   { id: 'motorista_2', name: 'Mariana Lima', email: 'motorista2@example.com', phone: '41999998888' },
   { id: 'motorista_3', name: 'Ricardo Andrade', email: 'motorista3@example.com', phone: '41977776666' },
+];
+
+export const mockRegisteredClinics: User[] = [
+  { id: 'clinic_1', name: 'Clínica Vet Top (Teste)', cnpj: '11.222.333/0001-44', phone: '(41) 3333-4444', email: 'clinic1@test.com', userType: 'clinica', address: { cep: '81000-100', street: 'Avenida das Clínicas', number: '789', neighborhood: 'Batel', city: 'Curitiba', state: 'PR' } },
+  { id: 'clinic_2', name: 'Clínica Amigo Fiel', cnpj: '22.333.444/0001-55', phone: '(41) 3444-5555', email: 'clinic2@test.com', userType: 'clinica', address: { cep: '82000-200', street: 'Rua dos Animais', number: '123', neighborhood: 'Santa Felicidade', city: 'Curitiba', state: 'PR' } },
+  { id: 'clinic_3', name: 'Clínica Parceira (Teste)', cnpj: '33.444.555/0001-66', phone: '(41) 3555-6666', email: 'clinic3@test.com', userType: 'clinica', address: { cep: '83005-000', street: 'Avenida das Torres', number: '456', neighborhood: 'Centro', city: 'São José dos Pinhais', state: 'PR' } },
+  { id: 'clinic_4', name: 'Hospital Veterinário Curitiba', cnpj: '44.555.666/0001-77', phone: '(41) 3666-7777', email: 'clinic4@test.com', userType: 'clinica', address: { cep: '80530-000', street: 'Rua Mateus Leme', number: '789', neighborhood: 'Centro Cívico', city: 'Curitiba', state: 'PR' } },
 ];
 
 export const generateMockRemovals = (): Removal[] => {
@@ -22,6 +30,7 @@ export const generateMockRemovals = (): Removal[] => {
     // Gerar 2 remoções para o Financeiro Junior (Coletivo)
     for (let i = 0; i < 2; i++) {
         mockRemovals.push({
+            id: uuidv4(),
             code: `FINJR_COLETIVO_${i+1}`,
             createdById: 'clinic_456',
             clinicName: 'Clínica Amigo Fiel',
@@ -49,6 +58,7 @@ export const generateMockRemovals = (): Removal[] => {
     // Gerar 2 remoções para o Financeiro Junior (Individual)
     for (let i = 0; i < 2; i++) {
         mockRemovals.push({
+            id: uuidv4(),
             code: `FINJR_INDIVIDUAL_${i+1}`,
             createdById: 'pf_123',
             modality: i % 2 === 0 ? 'individual_ouro' : 'individual_prata',
@@ -77,6 +87,7 @@ export const generateMockRemovals = (): Removal[] => {
     // NOVOS DADOS PARA TESTE DO FINANCEIRO JUNIOR
     const testRemovalsForFinJr: Removal[] = [
         {
+            id: uuidv4(),
             code: `TESTE_FINJR_COLETIVO_FATURADO`,
             createdById: 'clinic_456',
             clinicName: 'Clínica Vet+',
@@ -99,6 +110,7 @@ export const generateMockRemovals = (): Removal[] => {
             assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
         },
         {
+            id: uuidv4(),
             code: `TESTE_FINJR_INDIVIDUAL_SEM_CONTATO`,
             createdById: 'pf_123',
             modality: 'individual_prata',
@@ -122,6 +134,7 @@ export const generateMockRemovals = (): Removal[] => {
             assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
         },
         {
+            id: uuidv4(),
             code: `TESTE_FINJR_FINALIZADA`,
             createdById: 'pf_123',
             modality: 'individual_ouro',
@@ -151,6 +164,7 @@ export const generateMockRemovals = (): Removal[] => {
     // Gerar 3 remoções faturadas para a mesma clínica
     for (let i = 0; i < 3; i++) {
         const faturadoRemoval: Removal = {
+            id: uuidv4(),
             code: `FATURADO${i+1}`,
             createdById: 'clinic_456',
             clinicName: 'Clínica Vet Top (Teste)',
@@ -195,6 +209,7 @@ export const generateMockRemovals = (): Removal[] => {
     // Gerar 3 remoções coletivas para a aba "Pendentes Coletivos" do Operacional
     for (let i = 0; i < 3; i++) {
         const coletivoPendente: Removal = {
+            id: uuidv4(),
             code: `COLETIVO_OP_${i+1}`,
             createdById: 'clinic_456',
             clinicName: 'Clínica Parceira (Teste)',
@@ -236,6 +251,7 @@ export const generateMockRemovals = (): Removal[] => {
     // Gerar 2 remoções individuais cremadas para "Montar Sacola"
     for (let i = 0; i < 2; i++) {
         mockRemovals.push({
+            id: uuidv4(),
             code: `CREMADO_IND_${i+1}`,
             createdById: 'pf_123',
             modality: 'individual_prata',
@@ -261,6 +277,7 @@ export const generateMockRemovals = (): Removal[] => {
 
     const prontoParaEntregaRemovals: Removal[] = [
         {
+            id: uuidv4(),
             code: `PRONTO_1`,
             createdById: 'pf_123',
             modality: 'individual_ouro',
@@ -290,6 +307,7 @@ export const generateMockRemovals = (): Removal[] => {
             assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
         },
         {
+            id: uuidv4(),
             code: `PRONTO_2`,
             createdById: 'pf_123',
             modality: 'individual_prata',
@@ -319,6 +337,7 @@ export const generateMockRemovals = (): Removal[] => {
             assignedFinanceiroJunior: { id: 'func_financeiro_junior_1', name: 'Financeiro Junior 1 (Teste)' },
         },
         {
+            id: uuidv4(),
             code: `PRONTO_3`,
             createdById: 'pf_123',
             modality: 'individual_prata',
@@ -354,6 +373,7 @@ export const generateMockRemovals = (): Removal[] => {
     // Gerar 5 remoções individuais finalizadas para o cremador
     for (let i = 0; i < 5; i++) {
         mockRemovals.push({
+            id: uuidv4(),
             code: `CREM_${i+1}`,
             createdById: 'pf_123',
             modality: 'individual_prata',
@@ -427,6 +447,7 @@ export const generateMockRemovals = (): Removal[] => {
       }
 
       const removal: Removal = {
+        id: uuidv4(),
         code: `MOCK${i.toString().padStart(4, '0')}`,
         createdById: ownerId,
         clinicName: ownerId === 'clinic_456' ? 'Clínica Vet Top (Teste)' : undefined,

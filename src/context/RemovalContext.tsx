@@ -1,17 +1,17 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Removal, RemovalStatus, CremationBatch, CremationBatchItem } from '../types';
 import { generateMockRemovals } from '../data/mock';
 import { differenceInMinutes, parse, isBefore } from 'date-fns';
 import { useNotifications } from './NotificationContext';
+import { v4 as uuidv4 } from 'uuid';
 
 interface RemovalContextType {
   removals: Removal[];
-  addRemoval: (removal: Removal) => void;
-  updateRemoval: (code: string, updates: Partial<Removal>) => void;
+  addRemoval: (removal: Partial<Removal>) => void;
+  updateRemoval: (id: string, updates: Partial<Removal>) => void;
   updateMultipleRemovals: (codes: string[], updates: Partial<Removal>, firstRemoval: Removal) => void;
   getRemovalsByStatus: (status: RemovalStatus) => Removal[];
   getRemovalsByOwner: (ownerId: string) => Removal[];
-  generateRemovalCode: () => string;
   cremationBatches: CremationBatch[];
   createCremationBatch: (items: CremationBatchItem[], operatorName: string) => void;
   startCremationBatch: (batchId: string, operatorName: string) => void;
@@ -36,48 +36,14 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
   const [removals, setRemovals] = useState<Removal[]>([]);
   const [cremationBatches, setCremationBatches] = useState<CremationBatch[]>([]);
   const { addNotification } = useNotifications();
-  const lastCodeNumberRef = useRef(0);
   
   useEffect(() => {
-    const mockData = generateMockRemovals();
-    setRemovals(mockData);
-
-    // Encontra o maior número nos códigos existentes para evitar colisões
-    const maxNum = mockData.reduce((max, r) => {
-      const match = r.code.match(/\d+$/); // Pega a parte numérica no final do código
-      if (match) {
-        const num = parseInt(match[0], 10);
-        if (num > max) {
-          return num;
-        }
-      }
-      return max;
-    }, 0);
-    
-    lastCodeNumberRef.current = maxNum;
+    const mockDataWithIds = generateMockRemovals().map(r => ({
+        ...r,
+        id: r.id || uuidv4(),
+    }));
+    setRemovals(mockDataWithIds);
   }, []);
-
-  const generateRemovalCode = (): string => {
-    lastCodeNumberRef.current += 1;
-    const newNumber = lastCodeNumberRef.current;
-    
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    // O prefixo muda a cada 1.000.000 de remoções
-    const letterIndex = Math.floor((newNumber - 1) / 999999);
-    const numberPart = ((newNumber - 1) % 999999) + 1;
-    
-    let prefix = '';
-    if (letterIndex < 26) {
-        prefix = letters[letterIndex];
-    } else {
-        // Lógica para prefixos com duas letras (ex: AA, AB...), suportando milhões de combinações
-        const firstLetter = letters[Math.floor(letterIndex / 26) - 1];
-        const secondLetter = letters[letterIndex % 26];
-        prefix = `${firstLetter}${secondLetter}`;
-    }
-    
-    return `${prefix}${numberPart.toString().padStart(6, '0')}`;
-  };
 
   // Efeito para verificar agendamentos
   useEffect(() => {
@@ -88,9 +54,8 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
           try {
             const scheduledDateTime = parse(`${r.scheduledDate} ${r.scheduledTime}`, 'yyyy-MM-dd HH:mm', new Date());
             
-            // Verifica se o horário agendado já passou e se a diferença é de até 10 minutos
             if (isBefore(scheduledDateTime, now) && differenceInMinutes(now, scheduledDateTime) <= 10) {
-              updateRemoval(r.code, {
+              updateRemoval(r.id, {
                 status: 'solicitada',
                 history: [
                   ...r.history,
@@ -114,16 +79,45 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
   }, [removals]);
 
 
-  const addRemoval = (removal: Removal) => {
-    setRemovals(prev => [removal, ...prev]);
-    addNotification(`Nova remoção solicitada "${removal.code}".`, { recipientRole: 'receptor' });
+  const addRemoval = (removalData: Partial<Removal>) => {
+    const newRemoval: Removal = {
+      id: uuidv4(),
+      code: '',
+      createdAt: new Date().toISOString(),
+      // Default values for required fields
+      createdById: '',
+      modality: '',
+      tutor: { cpfOrCnpj: '', name: '', phone: '', email: '' },
+      pet: { name: '', species: '', breed: '', gender: '', weight: '', causeOfDeath: '' },
+      removalAddress: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' },
+      additionals: [],
+      paymentMethod: '',
+      value: 0,
+      observations: '',
+      requestType: 'agora',
+      status: 'solicitada',
+      history: [],
+      ...removalData,
+    };
+
+    newRemoval.history = newRemoval.history || [];
+    if (!newRemoval.history.some(h => h.action.includes('criada'))) {
+        newRemoval.history.unshift({
+            date: newRemoval.createdAt,
+            action: `Solicitação criada por ${removalData.history?.[0]?.user || 'Sistema'}`,
+            user: removalData.history?.[0]?.user || 'Sistema'
+        });
+    }
+
+    setRemovals(prev => [newRemoval, ...prev]);
+    addNotification(`Nova remoção recebida.`, { recipientRole: 'receptor' });
   };
 
-  const updateRemoval = (code: string, updates: Partial<Removal>) => {
+  const updateRemoval = (id: string, updates: Partial<Removal>) => {
     let originalRemoval: Removal | undefined;
     setRemovals(prev =>
       prev.map(removal => {
-        if (removal.code === code) {
+        if (removal.id === id) {
           originalRemoval = removal;
           return { ...removal, ...updates };
         }
@@ -131,22 +125,27 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
       })
     );
     
-    // Disparar notificações com base na atualização
+    if (originalRemoval && updates.code && !originalRemoval.code) {
+        addNotification(`Código ${updates.code} definido para a remoção.`, { recipientRole: 'receptor' });
+        addNotification(`Código ${updates.code} definido para a remoção.`, { recipientRole: 'motorista' });
+        addNotification(`Código ${updates.code} definido para a remoção.`, { recipientRole: 'financeiro_junior' });
+    }
+
     if (originalRemoval && updates.status) {
       switch(updates.status) {
         case 'em_andamento':
           if (updates.assignedDriver) {
-            addNotification(`Nova remoção encaminhada a você: ${code}.`, { recipientId: updates.assignedDriver.id });
+            addNotification(`Nova remoção encaminhada a você: ${originalRemoval.code || id}.`, { recipientId: updates.assignedDriver.id });
           }
           break;
         case 'a_caminho':
-          addNotification(`O motorista está a caminho da sua solicitação ${code}.`, { recipientId: originalRemoval.createdById });
+          addNotification(`O motorista está a caminho da sua solicitação ${originalRemoval.code || id}.`, { recipientId: originalRemoval.createdById });
           break;
         case 'concluida':
-          addNotification(`Remoção ${code} está pronta para análise operacional.`, { recipientRole: 'operacional' });
+          addNotification(`Remoção ${originalRemoval.code || id} está pronta para análise operacional.`, { recipientRole: 'operacional' });
           break;
         case 'aguardando_financeiro_junior':
-          addNotification(`Remoção ${code} aguardando análise financeira.`, { recipientRole: 'financeiro_junior' });
+          addNotification(`Remoção ${originalRemoval.code || id} aguardando análise financeira.`, { recipientRole: 'financeiro_junior' });
           break;
       }
     }
@@ -159,7 +158,6 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
       )
     );
 
-    // Notificações para faturamento
     if (updates.status) {
       switch(updates.status) {
         case 'aguardando_boleto':
@@ -264,7 +262,6 @@ export const RemovalProvider: React.FC<RemovalProviderProps> = ({ children }) =>
     updateMultipleRemovals,
     getRemovalsByStatus,
     getRemovalsByOwner,
-    generateRemovalCode,
     cremationBatches,
     createCremationBatch,
     startCremationBatch,

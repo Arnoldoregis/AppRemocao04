@@ -17,7 +17,7 @@ const FinanceiroMasterActions: React.FC<FinanceiroMasterActionsProps> = ({ remov
 
   const handleFinalize = () => {
     if (!user) return;
-    updateRemoval(removal.code, {
+    updateRemoval(removal.id, {
       status: 'finalizada',
       history: [
         ...removal.history,
